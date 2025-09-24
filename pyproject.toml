@@ -7,7 +7,10 @@ authors = [
     { name = "Juan José Expósito González", email = "expositogonzalez.juanjose@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "pydantic>=2.11.9",
+    "sqlmodel>=0.0.25",
+]
 
 [project.scripts]
 expenses-ai-agent = "expenses_ai_agent:main"
@@ -15,3 +18,15 @@ expenses-ai-agent = "expenses_ai_agent:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "logfire>=4.10.0",
+    "poethepoet>=0.37.0",
+    "pytest-coverage>=0.0",
+    "pytest-mock>=3.15.1",
+    "ty>=0.0.1a21",
+]
+
+[tool.poe.tasks]
+test = "pytest -vv --cov=src"
