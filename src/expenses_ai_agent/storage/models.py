@@ -61,8 +61,8 @@ class Expense(SQLModel, table=True):
     currency: Currency = Field(default=Currency.EUR)
     description: str | None = None
     date: datetime = Field(default=datetime.now(timezone.utc))
-    created_at: datetime = Field(default=datetime.now(timezone.utc))
-    updated_at: datetime = Field(default=datetime.now(timezone.utc))
+    created_at: datetime | None = Field(default=datetime.now(timezone.utc))
+    updated_at: datetime | None = Field(default=datetime.now(timezone.utc))
 
     category_id: int | None = Field(default=None, foreign_key="expensecategory.id")
     category: ExpenseCategory | None = Relationship(back_populates="expenses")
