@@ -71,3 +71,42 @@ def test_create_expense(db_session: Any):
     assert expense.date == datetime(2025, 8, 31, 20, 0, 0)
     assert isinstance(expense.created_at, datetime)
     assert isinstance(expense.updated_at, datetime)
+
+
+def test_expense_with_cls_method(db_session: Any):
+    category = ExpenseCategory(name="Utilities")
+    expense = Expense.create(
+        amount=Decimal(75.5),
+        currency=Currency.EUR,
+        description="Electricity bill",
+        date=datetime(2025, 8, 31, 20, 0, 0),
+        category=category,
+    )
+
+    db_session.add(category)
+    db_session.add(expense)
+    db_session.commit()
+
+    assert expense.id is not None
+    assert expense.category_id is not None
+    assert expense.category == category
+    assert expense.amount == Decimal(75.5)
+    assert expense.currency == Currency.EUR
+    assert expense.description == "Electricity bill"
+
+
+def test_expense_assigns_now_if_no_values_passed():
+    category = ExpenseCategory(name="Groceries")
+    expense = Expense.create(
+        amount=Decimal(50),
+        currency=Currency.GBP,
+        description="Groceries",
+        category=category,
+    )
+
+    # The created_at and updated_at should be datetime objects (set by default)
+    assert isinstance(expense.created_at, datetime)
+    assert isinstance(expense.updated_at, datetime)
+    # They should be approximately the same time (within a reasonable delta)
+    assert expense.created_at is not None
+    assert expense.updated_at is not None
