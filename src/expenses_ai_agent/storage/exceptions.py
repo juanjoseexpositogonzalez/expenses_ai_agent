@@ -5,6 +5,13 @@ class CategoryNotFoundError(Exception):
         self.message = message
 
 
+class CategoryCreationError(Exception):
+    """Raised when there is an error creating a category."""
+
+    def __init__(self, message: str = "Error creating category"):
+        self.message = message
+
+
 class ExpenseCreationError(Exception):
     """Raised when there is an error creating an expense."""
 
