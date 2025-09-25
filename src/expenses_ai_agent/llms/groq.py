@@ -32,9 +32,7 @@ class GroqAssistant(Assistant):
             messages=messages,  # type:ignore
             max_tokens=self.max_response_tokens,
         )
-        return ExpenseCategorizationResponse.model_validate(
-            chat_completion.choices[0].message.content
-        )
+        return chat_completion.choices[0].message.content  # type: ignore
 
     def calculate_cost(self, messages: MESSAGES) -> Decimal:
         """Calculate the cost of the provided messages.
