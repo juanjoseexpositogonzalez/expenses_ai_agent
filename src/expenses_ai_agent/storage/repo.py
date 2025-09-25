@@ -250,10 +250,16 @@ class InMemoryExpenseRepository(ExpenseRepository):
 class DBCategoryRepo(CategoryRepository):
     """A repository that uses a database to store categories"""
 
-    def __init__(self, db_url: str):
+    def __init__(self, db_url: str, session: Session | None = None):
         """Initialize the repository with an optional SQLModel session."""
-        self.engine = create_engine(db_url)
-        self.session = Session(self.engine)
+        if session:
+            self.session = session
+            self.engine = None
+            self._owns_session = False
+        else:
+            self.engine = create_engine(db_url)
+            self.session = Session(self.engine)
+            self._owns_session = True
 
     def __enter__(self):  # pragma: no cover
         """Enter the context manager"""
@@ -263,29 +269,50 @@ class DBCategoryRepo(CategoryRepository):
         self, exc_type: str | None, exc_val: int, ext_tb: str | None
     ) -> None:  # pragma: no cover
         """Exit the context manager"""
-        self.session.close()
+        if self._owns_session:
+            self.session.close()
 
     def add(self, category: ExpenseCategory) -> None:
         """Add a new ExpenseCategory"""
-        with self.session as session:
-            session.add(category)
-            session.commit()
+        if self._owns_session:
+            with self.session as session:
+                session.add(category)
+                session.commit()
+        else:
+            self.session.add(category)
+            self.session.commit()
 
     def update(self, category: ExpenseCategory) -> None:
         """Update an existing ExpenseCategory"""
-        with self.session as session:
-            db_category = session.get(ExpenseCategory, category.id)
+        if self._owns_session:
+            with self.session as session:
+                db_category = session.get(ExpenseCategory, category.id)
+                if not db_category:
+                    raise CategoryNotFoundError()
+                db_category.name = category.name
+                session.add(db_category)
+                session.commit()
+        else:
+            db_category = self.session.get(ExpenseCategory, category.id)
             if not db_category:
                 raise CategoryNotFoundError()
             db_category.name = category.name
-            session.add(db_category)
-            session.commit()
+            self.session.add(db_category)
+            self.session.commit()
 
     def get(self, name: str) -> ExpenseCategory | None:
         """Get a category by name"""
-        with self.session as session:
+        if self._owns_session:
+            with self.session as session:
+                statement = select(ExpenseCategory).where(ExpenseCategory.name == name)
+                results = session.exec(statement)
+                category = results.first()
+                if not category:
+                    raise CategoryNotFoundError()
+                return category
+        else:
             statement = select(ExpenseCategory).where(ExpenseCategory.name == name)
-            results = session.exec(statement)
+            results = self.session.exec(statement)
             category = results.first()
             if not category:
                 raise CategoryNotFoundError()
@@ -293,19 +320,34 @@ class DBCategoryRepo(CategoryRepository):
 
     def delete(self, name: str) -> None:
         """Delete a category by name"""
-        with self.session as session:
+        if self._owns_session:
+            with self.session as session:
+                statement = select(ExpenseCategory).where(ExpenseCategory.name == name)
+                results = session.exec(statement)
+                category = results.first()
+                if not category:
+                    raise CategoryNotFoundError()
+                session.delete(category)
+                session.commit()
+        else:
             statement = select(ExpenseCategory).where(ExpenseCategory.name == name)
-            results = session.exec(statement)
+            results = self.session.exec(statement)
             category = results.first()
             if not category:
                 raise CategoryNotFoundError()
-            session.delete(category)
-            session.commit()
+            self.session.delete(category)
+            self.session.commit()
 
     def list(self) -> Sequence[str]:
         """List all categories"""
-        with self.session as session:
+        if self._owns_session:
+            with self.session as session:
+                statement = select(ExpenseCategory)
+                results = session.exec(statement)
+                categories = results.all()
+                return [category.name for category in categories]
+        else:
             statement = select(ExpenseCategory)
-            results = session.exec(statement)
+            results = self.session.exec(statement)
             categories = results.all()
             return [category.name for category in categories]
