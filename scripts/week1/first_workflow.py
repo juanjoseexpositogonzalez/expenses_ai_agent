@@ -5,7 +5,6 @@ from sqlmodel import Session, create_engine
 
 from expenses_ai_agent.storage.exceptions import ExpenseCreationError
 from expenses_ai_agent.storage.models import (
-    Category,
     Currency,
     Expense,
     ExpenseCategory,
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 def first_workflow() -> None:
     """Demonstrates a simple workflow of creating and displaying an expense category and an expense."""
     # Create a new expense category
-    category = ExpenseCategory.create(name=Category.FOOD)
+    category = ExpenseCategory.create(name="Food")
     logger.info("Category created %s", category)
     logger.info("Adding category to the database...")
     engine = create_engine("sqlite:///expenses.db")

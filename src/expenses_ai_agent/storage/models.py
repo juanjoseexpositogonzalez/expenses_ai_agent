@@ -12,19 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 @verify(UNIQUE)
-class Category(StrEnum):
-    FOOD = "Food"
-    TRANSPORT = "Transport"
-    UTILITIES = "Utilities"
-    ENTERTAINMENT = "Entertainment"
-    HEALTH = "Health"
-    EDUCATION = "Education"
-    PERSONAL_CARE = "Personal Care"
-    MISCELLANEOUS = "Miscellaneous"
-    OTHER = "Other"
-
-
-@verify(UNIQUE)
 class Currency(StrEnum):
     USD = "USD"
     EUR = "EUR"
@@ -44,15 +31,15 @@ class ExpenseCategory(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
 
     id: int | None = Field(default=None, primary_key=True)
-    name: Category = Field(index=True, unique=True)
+    name: str = Field(index=True, unique=True)
 
     expenses: List["Expense"] = Relationship(back_populates="category")
 
     def __str__(self) -> str:
-        return f"Category: {self.name.value}"
+        return f"Category: {self.name}"
 
     @classmethod
-    def create(cls, name: Category) -> Self:
+    def create(cls, name: str) -> Self:
         """Create a new ExpenseCategory instance.
 
         Args:
