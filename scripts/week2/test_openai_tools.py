@@ -31,7 +31,7 @@ def main() -> None:
 
     available_models: Sequence[str] = openai_assistant.get_available_models()
     logger.info(
-        "There are %d available models: %s", len(available_models), available_models
+        "There are %d available models in the OpenAI library", len(available_models)
     )
     completion = openai_assistant.completion(messages=messages)
 
