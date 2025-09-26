@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Sequence
+from typing import Any, Dict, Sequence
 
 from openai import OpenAI
 
@@ -13,6 +13,7 @@ class OpenAIAssistant(Assistant):
     """OpenAI LLM Assistant implementation."""
 
     structured_output: Any | None = None
+    tools: Sequence[Dict[str, Any]] | None = None
 
     prompt_tokens: int = field(default=0, init=False)
     completion_tokens: int = field(default=0, init=False)
@@ -68,12 +69,14 @@ class OpenAIAssistant(Assistant):
             max_tokens=self.max_response_tokens,
             temperature=self.temperature,
             top_p=self.top_p,
+            tools=self.tools,
+            tool_choice="auto" if self.tools else None,
         )
         # Update token usage
         self.prompt_tokens = chat_completion.usage.prompt_tokens  # type: ignore
         self.completion_tokens = chat_completion.usage.completion_tokens  # type: ignore
         self.total_tokens = chat_completion.usage.total_tokens  # type: ignore
-        return chat_completion.choices[0].message.content  # type: ignore
+        return chat_completion.choices[0].message  # type: ignore
 
     def calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Calculate the cost of the provided messages.

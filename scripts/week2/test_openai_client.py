@@ -33,7 +33,7 @@ def main() -> None:
     )
     completion = openai_assistant.completion(messages=messages)
 
-    logger.info("Completion %s", completion)
+    logger.info("Completion %s", completion.content)  # type: ignore
 
     logger.info(
         "Total Cost: $%s",
