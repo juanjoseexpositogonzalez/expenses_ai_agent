@@ -64,7 +64,7 @@ class Assistant(Protocol):
         """
 
     @abstractmethod
-    def calculate_cost(self, prompt_tokes: int, completion_tokens: int) -> Decimal:
+    def calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Calculate the cost of the provided messages.
 
         Args:
