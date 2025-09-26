@@ -1,8 +1,8 @@
 from abc import abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
-from typing import Dict, List, Protocol, Sequence
+from typing import Any, Dict, List, Protocol, Sequence
 
 from expenses_ai_agent.llms.output import ExpenseCategorizationResponse
 
@@ -43,13 +43,14 @@ class Assistant(Protocol):
     """Contract class for LLM Assistant implementations."""
 
     api_key: str
-    provider: LLMProvider
     model: str
-    max_response_tokens: int
+    provider: LLMProvider
+    client: Any = field(init=False)
+    max_response_tokens: int = 1000
     max_completion_tokens: int | None = None
     temperature: float = 0.7
     top_p: float = 1.0
-    models_cost: COST  # e.g., {"gpt-4": [0.03, 0.06]}
+    models_cost: COST = field(default_factory=dict)  # e.g., {"gpt-4": [0.03, 0.06]}
 
     @abstractmethod
     def completion(self, messages: MESSAGES) -> ExpenseCategorizationResponse:
