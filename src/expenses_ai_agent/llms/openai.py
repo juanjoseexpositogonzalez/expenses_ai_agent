@@ -86,7 +86,7 @@ class OpenAIAssistant(Assistant):
             tool_messages: MESSAGES = []
             for tc in msg.tool_calls:  # type: ignore
                 if tc.function.name == "convert_currency":
-                    args = json.loads(tc.arguments)  # type: ignore
+                    args = json.loads(tc.function.arguments)  # type: ignore
                     amount: Decimal = Decimal(args["amount"])
                     try:
                         from_cur = Currency(args["from_currency"].upper())
@@ -116,9 +116,9 @@ class OpenAIAssistant(Assistant):
             messages.extend(
                 [
                     {
-                        "role": "assisant",
+                        "role": "assistant",
                         "content": "None",
-                        "tool_calls": chat_completion.tool_calls,
+                        "tool_calls": msg.tool_calls,
                     },
                     *tool_messages,
                 ]
