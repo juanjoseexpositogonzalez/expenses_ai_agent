@@ -37,4 +37,43 @@ def convert_currency_tool_schema() -> Dict[str, Any]:
     }
 
 
-TOOLS: Final[List[Dict[str, Any]]] = [convert_currency_tool_schema()]
+def format_datetime_tool_schema() -> Dict[str, Any]:
+    return {
+        "type": "function",
+        "function": {
+            "name": "format_datetime",
+            "description": "Format a datetime into 'DD/MM/YYYY HH:MM'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dt": {
+                        "type": "string",
+                        "description": (
+                            "Datetime in ISO 8601 format "
+                            "(e.g., '2025-09-26T12:34:00' or "
+                            "'2025-09-26T12:34:00+02:00'). "
+                            "If no timezone offset is provided, 'output_tz' will be assumed."
+                        ),
+                        "format": "date-time",
+                    },
+                    "output_tz": {
+                        "type": "string",
+                        "description": (
+                            "IANA timezone name for the output "
+                            "(e.g., 'Europe/Madrid', 'UTC'). "
+                            "Used if 'dt' has no explicit offset."
+                        ),
+                        "default": "Europe/Madrid",
+                    },
+                },
+                "required": ["dt"],
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
+TOOLS: Final[List[Dict[str, Any]]] = [
+    convert_currency_tool_schema(),
+    format_datetime_tool_schema(),
+]

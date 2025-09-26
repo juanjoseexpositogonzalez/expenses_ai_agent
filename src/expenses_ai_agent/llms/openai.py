@@ -9,6 +9,7 @@ from expenses_ai_agent.llms.base import MESSAGES, Assistant, LLMProvider
 from expenses_ai_agent.llms.output import ExpenseCategorizationResponse
 from expenses_ai_agent.storage.models import Currency
 from expenses_ai_agent.utils.currency import convert_currency
+from expenses_ai_agent.utils.date_formatter import format_datetime
 
 
 @dataclass
@@ -110,6 +111,22 @@ class OpenAIAssistant(Assistant):
                             "tool_call_id": tc.id,  # type: ignore
                             "name": tc.function.name,
                             "content": f"The result is {result} {to_cur.value}",
+                        }
+                    )
+
+                elif tc.function.name == "format_datetime":
+                    args = json.loads(tc.function.arguments)  # type: ignore
+                    dt: str = args["dt"]
+                    output_tz: str = args.get("output_tz", "Europe/Madrid")
+
+                    result = format_datetime(dt=dt, output_tz=output_tz)
+
+                    tool_messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.id,  # type: ignore
+                            "name": tc.function.name,
+                            "content": f"The formatted datetime is: {result}",
                         }
                     )
 
