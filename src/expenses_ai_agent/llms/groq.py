@@ -32,11 +32,12 @@ class GroqAssistant(Assistant):
         )
         return chat_completion.choices[0].message.content  # type: ignore
 
-    def calculate_cost(self, messages: MESSAGES) -> Decimal:
+    def calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Calculate the cost of the provided messages.
 
         Args:
-            messages (MESSAGES): A list of message dictionaries.
+            prompt_tokens (int): Number of tokens in the prompt.
+            completion_tokens (int): Number of tokens in the completion.
 
         Returns:
             Decimal: The calculated cost.
