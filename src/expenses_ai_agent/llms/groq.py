@@ -12,10 +12,8 @@ from expenses_ai_agent.llms.output import ExpenseCategorizationResponse
 class GroqAssistant(Assistant):
     """Groq LLM Assistant implementation."""
 
-    provider: LLMProvider = LLMProvider.GROQ
-    client: Groq
-
-    def __post__init__(self):
+    def __post_init__(self):
+        self.provider: LLMProvider = LLMProvider.GROQ
         self.client = Groq(api_key=self.api_key)
 
     def completion(self, messages: MESSAGES) -> ExpenseCategorizationResponse:
