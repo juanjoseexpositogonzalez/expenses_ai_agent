@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Dict, Sequence
@@ -6,6 +7,8 @@ from openai import OpenAI
 
 from expenses_ai_agent.llms.base import MESSAGES, Assistant, LLMProvider
 from expenses_ai_agent.llms.output import ExpenseCategorizationResponse
+from expenses_ai_agent.storage.models import Currency
+from expenses_ai_agent.utils.currency import convert_currency
 
 
 @dataclass
@@ -76,7 +79,59 @@ class OpenAIAssistant(Assistant):
         self.prompt_tokens = chat_completion.usage.prompt_tokens  # type: ignore
         self.completion_tokens = chat_completion.usage.completion_tokens  # type: ignore
         self.total_tokens = chat_completion.usage.total_tokens  # type: ignore
-        return chat_completion.choices[0].message  # type: ignore
+
+        msg = chat_completion.choices[0].message  # type: ignore
+
+        if msg.tool_calls:  # type: ignore
+            tool_messages: MESSAGES = []
+            for tc in msg.tool_calls:  # type: ignore
+                if tc.function.name == "convert_currency":
+                    args = json.loads(tc.arguments)  # type: ignore
+                    amount: Decimal = Decimal(args["amount"])
+                    try:
+                        from_cur = Currency(args["from_currency"].upper())
+                    except (KeyError, ValueError):
+                        from_cur = Currency[args["from_currency"].upper()]
+                    if "to_currency" in args:
+                        try:
+                            to_cur = Currency(args["to_currency"].upper())
+                        except (KeyError, ValueError):
+                            to_cur = Currency[args["to_currency"].upper()]
+                    else:
+                        to_cur = Currency.EUR
+
+                    result = convert_currency(
+                        amount=amount, from_currency=from_cur, to_currency=to_cur
+                    )
+
+                    tool_messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.id,  # type: ignore
+                            "name": tc.function.name,
+                            "content": f"The result is {result} {to_cur.value}",
+                        }
+                    )
+
+            messages.extend(
+                [
+                    {
+                        "role": "assisant",
+                        "content": "None",
+                        "tool_calls": chat_completion.tool_calls,
+                    },
+                    *tool_messages,
+                ]
+            )
+
+            final = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,  # type:ignore
+            )
+        else:
+            final = chat_completion
+
+        return final.choices[0].message  # type: ignore
 
     def calculate_cost(self, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Calculate the cost of the provided messages.
