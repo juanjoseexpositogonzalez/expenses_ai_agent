@@ -351,3 +351,151 @@ class DBCategoryRepo(CategoryRepository):
             results = self.session.exec(statement)
             categories = results.all()
             return [category.name for category in categories]
+
+
+class DBExpenseRepo(ExpenseRepository):
+    """A repository that uses a database to store expenses"""
+
+    def __init__(self, db_url: str, session: Session | None = None):
+        """Initialize the repository with an optional SQLModel session."""
+        if session:
+            self.session = session
+            self.engine = None
+            self._owns_session = False
+        else:
+            self.engine = create_engine(db_url)
+            self.session = Session(self.engine)
+            self._owns_session = True
+
+    def __enter__(self):  # pragma: no cover
+        """Enter the context manager"""
+        return self
+
+    def __exit__(
+        self, exc_type: str | None, exc_val: int, ext_tb: str | None
+    ) -> None:  # pragma: no cover
+        """Exit the context manager"""
+        if self._owns_session:
+            self.session.close()
+
+    def add(self, expense: Expense) -> None:
+        """Add a new Expense"""
+        if self._owns_session:
+            with self.session as session:
+                session.add(expense)
+                session.commit()
+        else:
+            self.session.add(expense)
+            self.session.commit()
+
+    def update(self, expense: Expense) -> None:
+        """Update an existing Expense"""
+        if self._owns_session:
+            with self.session as session:
+                db_expense = session.get(Expense, expense.id)
+                if not db_expense:
+                    raise ExpenseNotFoundError()
+                db_expense.amount = expense.amount
+                db_expense.currency = expense.currency
+                db_expense.description = expense.description
+                db_expense.date = expense.date
+                db_expense.category_id = expense.category_id
+                session.add(db_expense)
+                session.commit()
+        else:
+            db_expense = self.session.get(Expense, expense.id)
+            if not db_expense:
+                raise ExpenseNotFoundError()
+            db_expense.amount = expense.amount
+            db_expense.currency = expense.currency
+            db_expense.description = expense.description
+            db_expense.date = expense.date
+            db_expense.category_id = expense.category_id
+            self.session.add(db_expense)
+            self.session.commit()
+
+    def get(self, expense_id: int) -> Expense | None:
+        """Get an expense by id"""
+        if self._owns_session:
+            with self.session as session:
+                expense = session.get(Expense, expense_id)
+                if not expense:
+                    raise ExpenseNotFoundError()
+                return expense
+        else:
+            expense = self.session.get(Expense, expense_id)
+            if not expense:
+                raise ExpenseNotFoundError()
+            return expense
+
+    def search_by_dates(
+        self, from_date: datetime, to_date: datetime
+    ) -> Sequence[Expense]:
+        """Seach for expeneses within a date range."""
+        if self._owns_session:
+            with self.session as session:
+                statement = select(Expense).where(
+                    Expense.date >= from_date, Expense.date <= to_date
+                )
+                results = session.exec(statement)
+                expenses = results.all()
+                if not expenses:
+                    raise ExpenseNotFoundError()
+                return expenses
+        else:
+            statement = select(Expense).where(
+                Expense.date >= from_date, Expense.date <= to_date
+            )
+            results = self.session.exec(statement)
+            expenses = results.all()
+            if not expenses:
+                raise ExpenseNotFoundError()
+            return expenses
+
+    def search_by_category(self, category: ExpenseCategory) -> Sequence[Expense]:
+        """Search for expenses by category."""
+        if self._owns_session:
+            with self.session as session:
+                statement = select(Expense).where(Expense.category_id == category.id)
+                results = session.exec(statement)
+                expenses = results.all()
+                if not expenses:
+                    raise ExpenseNotFoundError()
+                return expenses
+        else:
+            statement = select(Expense).where(Expense.category_id == category.id)
+            results = self.session.exec(statement)
+            expenses = results.all()
+            if not expenses:
+                raise ExpenseNotFoundError()
+            return expenses
+
+    def delete(self, expense_id: int) -> None:
+        """Delete an expense by ID."""
+        if self._owns_session:
+            with self.session as session:
+                expense = session.get(Expense, expense_id)
+                if not expense:
+                    raise ExpenseNotFoundError()
+                session.delete(expense)
+                session.commit()
+        else:
+            expense = self.session.get(Expense, expense_id)
+            if not expense:
+                raise ExpenseNotFoundError()
+            self.session.delete(expense)
+            self.session.commit()
+
+    def list(self) -> Sequence[Expense]:
+        """List all expenses."""
+        if self._owns_session:
+            with self.session as session:
+                statement = select(Expense)
+                results = session.exec(statement)
+                expenses = results.all()
+                return expenses
+        else:
+            statement = select(Expense)
+            results = self.session.exec(statement)
+            expenses = results.all()
+            return expenses
