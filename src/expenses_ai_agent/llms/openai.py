@@ -58,28 +58,56 @@ class OpenAIAssistant(Assistant):
             "gpt-oss-20b": [Decimal("0.00"), Decimal("0.0"), Decimal("0.0")],
         }
 
-    def completion(self, messages: MESSAGES) -> ExpenseCategorizationResponse:
+    def completion(self, messages: MESSAGES) -> ExpenseCategorizationResponse | Any:
         """Generate a response based on the messages provided.
 
         Args:
             messages (list[dict[str, str]]): A list of message dictionaries.
 
         Returns:
-            dict: The response containing the expense categorization.
+            ExpenseCategorizationResponse or message: The response containing the expense categorization.
         """
-        chat_completion = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,  # type:ignore
-            max_tokens=self.max_response_tokens,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            tools=self.tools,
-            tool_choice="auto" if self.tools else None,
+        # Build the create parameters
+        create_params = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": self.max_response_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+        }
+
+        # Add structured output if specified
+        if self.structured_output:
+            create_params["response_format"] = self.structured_output
+
+        # Add tools if specified (mutually exclusive with structured output)
+        if self.tools and not self.structured_output:
+            create_params["tools"] = self.tools
+            create_params["tool_choice"] = "auto"
+
+        chat_completion = (
+            self.client.beta.chat.completions.parse(
+                **create_params  # type: ignore
+            )
+            if self.structured_output
+            else self.client.chat.completions.create(
+                **create_params  # type: ignore
+            )
         )
         # Update token usage
         self.prompt_tokens = chat_completion.usage.prompt_tokens  # type: ignore
         self.completion_tokens = chat_completion.usage.completion_tokens  # type: ignore
         self.total_tokens = chat_completion.usage.total_tokens  # type: ignore
+
+        # If structured output is used, return the parsed object with calculated cost
+        if self.structured_output:
+            parsed_response = chat_completion.choices[0].message.parsed  # type: ignore
+            # Calculate the actual cost and update the response
+            actual_cost = self.calculate_cost(
+                self.prompt_tokens, self.completion_tokens
+            )
+            parsed_response.cost = actual_cost
+            return parsed_response
 
         msg = chat_completion.choices[0].message  # type: ignore
 
