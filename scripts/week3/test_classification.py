@@ -79,7 +79,6 @@ def main() -> None:
             category=category,
         )
         logger.info("Expense instance created: %s", expense)
-        breakpoint()
 
         # Try to get the category, if it doesn't exist, create it
         with Session(engine) as session:
@@ -87,6 +86,8 @@ def main() -> None:
             try:
                 category = repo.get(name=completion.category.strip())  # type: ignore
                 logger.info("Category '%s' already exists", category.name)  # type: ignore
+                # Need to assign the existing category to the expense
+                expense.category = category
 
             except CategoryNotFoundError:
                 logger.info(
