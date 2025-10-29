@@ -49,37 +49,105 @@ class OpenAIAssistant(Assistant):
                 Decimal("3.2"),
             ],
             "gpt-4.1-nano-2025-04-14": [
-                Decimal("0.20"),
-                Decimal("0.05"),
-                Decimal("0.80"),
+                Decimal("0.10"),
+                Decimal("0.025"),
+                Decimal("0.40"),
             ],
             "o4-mini-2025-04-16": [Decimal("4.0"), Decimal("1.0"), Decimal("16.0")],
             "gpt-oss-120b": [Decimal("0.00"), Decimal("0.0"), Decimal("0.0")],
             "gpt-oss-20b": [Decimal("0.00"), Decimal("0.0"), Decimal("0.0")],
         }
 
-    def completion(self, messages: MESSAGES) -> ExpenseCategorizationResponse:
+    def completion(self, messages: MESSAGES) -> ExpenseCategorizationResponse | Any:
         """Generate a response based on the messages provided.
 
         Args:
             messages (list[dict[str, str]]): A list of message dictionaries.
 
         Returns:
-            dict: The response containing the expense categorization.
+            ExpenseCategorizationResponse or message: The response containing the expense categorization.
         """
-        chat_completion = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,  # type:ignore
-            max_tokens=self.max_response_tokens,
-            temperature=self.temperature,
-            top_p=self.top_p,
-            tools=self.tools,
-            tool_choice="auto" if self.tools else None,
-        )
+        # Build the create parameters
+        create_params = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": self.max_response_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+        }
+
+        # Add structured output if specified
+        if self.structured_output:
+            create_params["response_format"] = self.structured_output
+
+        # Add tools if specified (mutually exclusive with structured output)
+        if self.tools and not self.structured_output:
+            create_params["tools"] = self.tools
+            create_params["tool_choice"] = "auto"
+
+        # Use regular completion for more reliable JSON parsing
+        # Remove response_format to avoid structured output issues
+        if self.structured_output:
+            regular_params = create_params.copy()
+            if "response_format" in regular_params:
+                del regular_params["response_format"]
+
+            chat_completion = self.client.chat.completions.create(
+                **regular_params  # type: ignore
+            )
+        else:
+            chat_completion = self.client.chat.completions.create(
+                **create_params  # type: ignore
+            )
         # Update token usage
         self.prompt_tokens = chat_completion.usage.prompt_tokens  # type: ignore
         self.completion_tokens = chat_completion.usage.completion_tokens  # type: ignore
         self.total_tokens = chat_completion.usage.total_tokens  # type: ignore
+
+        # If structured output is used, manually parse the JSON response
+        if self.structured_output:
+            content = chat_completion.choices[0].message.content
+
+            # Extract and clean JSON content
+            start_idx = content.find("{")
+            end_idx = content.rfind("}") + 1
+            if start_idx != -1 and end_idx > start_idx:
+                json_content = content[start_idx:end_idx]
+                try:
+                    parsed_data = json.loads(json_content)
+
+                    # Map field names from OpenAI's PascalCase to our snake_case
+                    field_mapping = {
+                        "Category": "category",
+                        "Total Amount": "total_amount",
+                        "Currency": "currency",
+                        "Confidence": "confidence",
+                        "Cost": "cost",
+                        "Comments": "comments",
+                        "Timestamp": "timestamp",
+                    }
+
+                    # Convert field names
+                    mapped_data = {}
+                    for key, value in parsed_data.items():
+                        mapped_key = field_mapping.get(key, key.lower())
+                        mapped_data[mapped_key] = value
+
+                    # Create ExpenseCategorizationResponse manually
+                    parsed_response = self.structured_output(**mapped_data)
+
+                    # Calculate the actual cost and update the response
+                    actual_cost = self.calculate_cost(
+                        self.prompt_tokens, self.completion_tokens
+                    )
+                    parsed_response.cost = actual_cost
+                    return parsed_response
+                except json.JSONDecodeError as e:
+                    raise ValueError(
+                        f"Failed to parse JSON response: {e}\nContent: {content}"
+                    )
+            else:
+                raise ValueError(f"No valid JSON found in response: {content}")
 
         msg = chat_completion.choices[0].message  # type: ignore
 
