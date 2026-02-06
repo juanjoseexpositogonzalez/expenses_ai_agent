@@ -89,6 +89,25 @@ class APIClient:
         response = self._client.delete(f"/expenses/{expense_id}")
         response.raise_for_status()
 
+    def get_users(self) -> list[int]:
+        """Get list of unique user IDs that have expenses.
+
+        Returns:
+            List of user IDs.
+        """
+        response = self._client.get("/expenses/users/")
+        response.raise_for_status()
+        return response.json()
+
+    def set_user_id(self, user_id: int) -> None:
+        """Update the user ID for all future requests.
+
+        Args:
+            user_id: The new user ID to use.
+        """
+        self.user_id = user_id
+        self._client.headers["X-User-ID"] = str(user_id)
+
     # ------------------------------------------------------------------
     # Analytics
     # ------------------------------------------------------------------
@@ -147,7 +166,13 @@ _client: APIClient | None = None
 
 
 def get_client() -> APIClient:
-    """Get or create API client singleton."""
+    """Get or create API client singleton.
+
+    Uses DEFAULT_USER_ID from .env for all requests.
+
+    Returns:
+        The API client instance.
+    """
     global _client
     if _client is None:
         _client = APIClient()

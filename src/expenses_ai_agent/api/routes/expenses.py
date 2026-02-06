@@ -131,6 +131,19 @@ def classify_expense(
     )
 
 
+@router.get("/users/", response_model=list[int])
+def get_users(expense_repo: ExpenseRepoDep) -> list[int]:
+    """Get list of unique user IDs that have expenses.
+
+    Args:
+        expense_repo: Expense repository dependency.
+
+    Returns:
+        List of unique telegram_user_id values.
+    """
+    return list(expense_repo.get_unique_user_ids())
+
+
 @router.get("/{expense_id}", response_model=ExpenseResponse)
 def get_expense(
     expense_id: int,

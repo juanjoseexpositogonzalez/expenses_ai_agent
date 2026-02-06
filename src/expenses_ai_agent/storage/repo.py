@@ -206,6 +206,14 @@ class ExpenseRepository(ABC):
             Sequence of (category_name, total) tuples.
         """
 
+    @abstractmethod
+    def get_unique_user_ids(self) -> Sequence[int]:
+        """Get list of unique user IDs that have expenses.
+
+        Returns:
+            Sequence of unique telegram_user_id values.
+        """
+
 
 class InMemoryCategoryRepository(CategoryRepository):
     """In-memory implementation of CategoryRepository."""
@@ -322,6 +330,10 @@ class InMemoryExpenseRepository(ExpenseRepository):
             totals[category_name] += expense.amount
 
         return list(totals.items())
+
+    def get_unique_user_ids(self) -> Sequence[int]:
+        user_ids = {e.telegram_user_id for e in self.expenses.values() if e.telegram_user_id}
+        return sorted(user_ids)
 
 
 class DBCategoryRepo(CategoryRepository):
@@ -619,6 +631,22 @@ class DBExpenseRepo(ExpenseRepository):
             totals[category_name] += expense.amount
 
         return list(totals.items())
+
+    def get_unique_user_ids(self) -> Sequence[int]:
+        """Get list of unique user IDs that have expenses."""
+        if self._owns_session:
+            with self.session as session:
+                statement = select(Expense.telegram_user_id).distinct().where(
+                    Expense.telegram_user_id.isnot(None)  # type: ignore[union-attr]
+                )
+                results = session.exec(statement)
+                return sorted(results.all())
+        else:
+            statement = select(Expense.telegram_user_id).distinct().where(
+                Expense.telegram_user_id.isnot(None)  # type: ignore[union-attr]
+            )
+            results = self.session.exec(statement)
+            return sorted(results.all())
 
 
 class UserPreferenceRepository(ABC):

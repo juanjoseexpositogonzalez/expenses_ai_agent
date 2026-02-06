@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Check API health
+# Get client (uses DEFAULT_USER_ID from .env)
 client = get_client()
 api_healthy = client.health_check()
 
