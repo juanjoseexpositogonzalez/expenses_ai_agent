@@ -64,6 +64,9 @@ class Expense(SQLModel, table=True):
     created_at: datetime | None = Field(default=datetime.now(timezone.utc))
     updated_at: datetime | None = Field(default=datetime.now(timezone.utc))
 
+    # Multiuser support - None for CLI expenses, user ID for Telegram/API
+    telegram_user_id: int | None = Field(default=None, index=True)
+
     category_id: int | None = Field(default=None, foreign_key="expensecategory.id")
     category: ExpenseCategory | None = Relationship(back_populates="expenses")
 
@@ -79,6 +82,7 @@ class Expense(SQLModel, table=True):
         description: str | None = None,
         date: datetime | None = None,
         category: ExpenseCategory | None = None,
+        telegram_user_id: int | None = None,
     ) -> Self:
         """Create a new Expense instance.
 
@@ -88,6 +92,7 @@ class Expense(SQLModel, table=True):
             description (str | None, optional): A description of the expense. Defaults to None.
             date (datetime | None, optional): The date of the expense. Defaults to current UTC time.
             category (ExpenseCategory | None, optional): The category of the expense. Defaults to None.
+            telegram_user_id (int | None, optional): The Telegram user ID. Defaults to None.
 
         Returns:
             Expense: A new instance of Expense.
@@ -98,6 +103,7 @@ class Expense(SQLModel, table=True):
             description=description,
             date=date or datetime.now(timezone.utc),
             category=category,
+            telegram_user_id=telegram_user_id,
         )
 
 

@@ -44,12 +44,14 @@ class ClassificationService:
         self,
         expense_description: str,
         persist: bool = False,
+        telegram_user_id: int | None = None,
     ) -> ClassificationResult:
         """Classify an expense description using the LLM.
 
         Args:
             expense_description: The raw expense text.
             persist: Whether to save the result to the database.
+            telegram_user_id: Optional Telegram user ID for multiuser support.
 
         Returns:
             ClassificationResult containing the LLM response and,
@@ -86,6 +88,7 @@ class ClassificationService:
             category, expense = self._persist_expense(
                 response=response,
                 description=expense_description,
+                telegram_user_id=telegram_user_id,
             )
             result.category = category
             result.expense = expense
@@ -98,6 +101,7 @@ class ClassificationService:
         expense_description: str,
         llm_response: ExpenseCategorizationResponse,
         selected_category: str,
+        telegram_user_id: int | None = None,
     ) -> ClassificationResult:
         """Persist an expense with a user-selected category (HITL override).
 
@@ -139,6 +143,7 @@ class ClassificationService:
         category, expense = self._persist_expense(
             response=response,
             description=expense_description,
+            telegram_user_id=telegram_user_id,
         )
 
         return ClassificationResult(
@@ -162,6 +167,7 @@ class ClassificationService:
         self,
         response: ExpenseCategorizationResponse,
         description: str,
+        telegram_user_id: int | None = None,
     ) -> tuple[ExpenseCategory, Expense]:
         """Get-or-create the category and persist the expense."""
         assert self.category_repo is not None  # noqa: S101
@@ -182,6 +188,7 @@ class ClassificationService:
             currency=response.currency,
             description=description,
             category=category,
+            telegram_user_id=telegram_user_id,
         )
         self.expense_repo.add(expense)
         logger.info("Persisted expense id=%s", expense.id)

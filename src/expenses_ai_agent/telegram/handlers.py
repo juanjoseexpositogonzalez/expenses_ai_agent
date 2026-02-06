@@ -343,7 +343,9 @@ class ExpenseConversationHandler:
             )
             return ConversationHandler.END
 
-        logger.info("User selected category: %s", selected_category)
+        user = update.effective_user
+        telegram_user_id = user.id if user else None
+        logger.info("User %s selected category: %s", telegram_user_id, selected_category)
 
         try:
             engine = create_engine(self.db_url)
@@ -361,18 +363,18 @@ class ExpenseConversationHandler:
                     expense_description=expense_description,
                     llm_response=llm_response,
                     selected_category=selected_category,
+                    telegram_user_id=telegram_user_id,
                 )
 
-            resp = result.response
+                resp = result.response
 
-            # Get user's preferred currency for display
-            preferred_currency = Currency.EUR
-            user = update.effective_user
-            if user:
-                pref_repo = DBUserPreferenceRepo(self.db_url, session=session)
-                pref = pref_repo.get_by_user_id(user.id)
-                if pref:
-                    preferred_currency = pref.preferred_currency
+                # Get user's preferred currency for display
+                preferred_currency = Currency.EUR
+                if telegram_user_id:
+                    pref_repo = DBUserPreferenceRepo(self.db_url, session=session)
+                    pref = pref_repo.get_by_user_id(telegram_user_id)
+                    if pref:
+                        preferred_currency = pref.preferred_currency
 
             amount_str = self._format_amount_with_conversion(
                 amount=resp.total_amount,

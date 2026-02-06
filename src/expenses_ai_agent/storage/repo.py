@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Dict, Sequence
 
-from sqlmodel import Session, create_engine, select
+from sqlmodel import Session, create_engine, func, select
 
 from expenses_ai_agent.storage.exceptions import (
     CategoryCreationError,
@@ -166,6 +168,44 @@ class ExpenseRepository(ABC):
     def list(self) -> Sequence[Expense]:
         """List all expenses."""
 
+    @abstractmethod
+    def list_by_user(self, telegram_user_id: int) -> Sequence[Expense]:
+        """List all expenses for a specific user.
+
+        Args:
+            telegram_user_id: The Telegram user ID.
+
+        Returns:
+            Sequence[Expense]: A list of expenses for the user.
+        """
+
+    @abstractmethod
+    def get_monthly_totals(
+        self, telegram_user_id: int, months: int = 12
+    ) -> Sequence[tuple[str, "Decimal"]]:
+        """Get monthly expense totals for charts.
+
+        Args:
+            telegram_user_id: The Telegram user ID.
+            months: Number of months to retrieve (default 12).
+
+        Returns:
+            Sequence of (month_str, total) tuples, e.g. [("2025-01", Decimal("150.00"))].
+        """
+
+    @abstractmethod
+    def get_category_totals(
+        self, telegram_user_id: int
+    ) -> Sequence[tuple[str, "Decimal"]]:
+        """Get total expenses grouped by category for a user.
+
+        Args:
+            telegram_user_id: The Telegram user ID.
+
+        Returns:
+            Sequence of (category_name, total) tuples.
+        """
+
 
 class InMemoryCategoryRepository(CategoryRepository):
     """In-memory implementation of CategoryRepository."""
@@ -250,6 +290,38 @@ class InMemoryExpenseRepository(ExpenseRepository):
 
     def list(self) -> Sequence[Expense]:
         return list(self.expenses.values())
+
+    def list_by_user(self, telegram_user_id: int) -> Sequence[Expense]:
+        return [
+            e for e in self.expenses.values()
+            if e.telegram_user_id == telegram_user_id
+        ]
+
+    def get_monthly_totals(
+        self, telegram_user_id: int, months: int = 12
+    ) -> Sequence[tuple[str, Decimal]]:
+        user_expenses = self.list_by_user(telegram_user_id)
+        totals: Dict[str, Decimal] = defaultdict(Decimal)
+
+        for expense in user_expenses:
+            month_key = expense.date.strftime("%Y-%m")
+            totals[month_key] += expense.amount
+
+        # Sort by month and return last N months
+        sorted_months = sorted(totals.items(), key=lambda x: x[0])
+        return sorted_months[-months:]
+
+    def get_category_totals(
+        self, telegram_user_id: int
+    ) -> Sequence[tuple[str, Decimal]]:
+        user_expenses = self.list_by_user(telegram_user_id)
+        totals: Dict[str, Decimal] = defaultdict(Decimal)
+
+        for expense in user_expenses:
+            category_name = expense.category.name if expense.category else "Uncategorized"
+            totals[category_name] += expense.amount
+
+        return list(totals.items())
 
 
 class DBCategoryRepo(CategoryRepository):
@@ -504,6 +576,49 @@ class DBExpenseRepo(ExpenseRepository):
             results = self.session.exec(statement)
             expenses = results.all()
             return expenses
+
+    def list_by_user(self, telegram_user_id: int) -> Sequence[Expense]:
+        """List all expenses for a specific user."""
+        if self._owns_session:
+            with self.session as session:
+                statement = select(Expense).where(
+                    Expense.telegram_user_id == telegram_user_id
+                )
+                results = session.exec(statement)
+                return results.all()
+        else:
+            statement = select(Expense).where(
+                Expense.telegram_user_id == telegram_user_id
+            )
+            results = self.session.exec(statement)
+            return results.all()
+
+    def get_monthly_totals(
+        self, telegram_user_id: int, months: int = 12
+    ) -> Sequence[tuple[str, Decimal]]:
+        """Get monthly expense totals for charts."""
+        expenses = self.list_by_user(telegram_user_id)
+        totals: Dict[str, Decimal] = defaultdict(Decimal)
+
+        for expense in expenses:
+            month_key = expense.date.strftime("%Y-%m")
+            totals[month_key] += expense.amount
+
+        sorted_months = sorted(totals.items(), key=lambda x: x[0])
+        return sorted_months[-months:]
+
+    def get_category_totals(
+        self, telegram_user_id: int
+    ) -> Sequence[tuple[str, Decimal]]:
+        """Get total expenses grouped by category for a user."""
+        expenses = self.list_by_user(telegram_user_id)
+        totals: Dict[str, Decimal] = defaultdict(Decimal)
+
+        for expense in expenses:
+            category_name = expense.category.name if expense.category else "Uncategorized"
+            totals[category_name] += expense.amount
+
+        return list(totals.items())
 
 
 class UserPreferenceRepository(ABC):
