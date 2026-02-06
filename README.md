@@ -129,6 +129,9 @@ expenses_ai_agent/
 ├── src/
 │   └── expenses_ai_agent/
 │       ├── __init__.py              # Package entry point
+│       ├── cli/                     # Command-line interface
+│       │   ├── __init__.py
+│       │   └── cli.py               # Typer CLI with classify/greet commands
 │       ├── llms/                    # LLM integrations
 │       │   ├── __init__.py
 │       │   ├── base.py              # Assistant protocol & base types
@@ -139,18 +142,29 @@ expenses_ai_agent/
 │       │   ├── __init__.py
 │       │   ├── system.py            # Classification system prompt
 │       │   └── user.py              # User prompt templates
+│       ├── services/                # Business logic layer
+│       │   ├── __init__.py
+│       │   ├── classification.py    # ClassificationService
+│       │   └── preprocessing.py     # InputPreprocessor (validation, XSS)
 │       ├── storage/                 # Data persistence layer
 │       │   ├── __init__.py
 │       │   ├── models.py            # SQLModel entities
 │       │   ├── repo.py              # Repository implementations
 │       │   └── exceptions.py        # Custom exceptions
+│       ├── telegram/                # Telegram bot
+│       │   ├── __init__.py
+│       │   ├── bot.py               # ExpenseTelegramBot main class
+│       │   ├── handlers.py          # Conversation handlers (HITL flow)
+│       │   ├── keyboards.py         # Inline keyboard builders
+│       │   └── exceptions.py        # Telegram-specific exceptions
 │       ├── tools/                   # LLM function calling tools
 │       │   ├── __init__.py
 │       │   └── tools.py             # Tool schemas
 │       └── utils/                   # Utility functions
 │           ├── __init__.py
 │           ├── currency.py          # Currency conversion
-│           └── date_formatter.py    # Datetime formatting
+│           ├── date_formatter.py    # Datetime formatting
+│           └── logging_config.py    # Centralized logging setup
 ├── scripts/                         # Example scripts & tests
 │   ├── week1/
 │   │   ├── currency_test.py
@@ -162,10 +176,23 @@ expenses_ai_agent/
 │   └── week3/
 │       ├── test_classification.py   # Main classification demo
 │       └── test_expense_repo.py
-├── tests/                           # Unit tests
-│   └── unit/
-│       ├── test_model.py
-│       └── test_repo.py
+├── tests/                           # Test suite (96% coverage)
+│   ├── unit/                        # Unit tests
+│   │   ├── test_bot.py
+│   │   ├── test_classification_service.py
+│   │   ├── test_cli.py
+│   │   ├── test_db_repos.py
+│   │   ├── test_keyboards.py
+│   │   ├── test_model.py
+│   │   ├── test_openai_assistant.py
+│   │   ├── test_preprocessing.py
+│   │   ├── test_repo.py
+│   │   ├── test_telegram_exceptions.py
+│   │   ├── test_telegram_handlers.py
+│   │   └── test_utils.py
+│   └── integration/                 # Integration tests (real API calls)
+│       ├── test_currency_integration.py
+│       └── test_openai_integration.py
 ├── .env.example                     # Environment variables template
 ├── pyproject.toml                   # Project configuration & dependencies
 ├── LICENSE                          # MIT License
@@ -267,6 +294,9 @@ ANTHROPIC_API_KEY="sk-ant-your-anthropic-key-here"
 
 # Currency Conversion API
 EXCHANGE_RATE_API_KEY="your-exchange-rate-api-key"
+
+# Telegram Bot (optional - for expenses-telegram-bot)
+TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
 ```
 
 ### Getting API Keys
@@ -277,6 +307,7 @@ EXCHANGE_RATE_API_KEY="your-exchange-rate-api-key"
 | **Groq** | [console.groq.com](https://console.groq.com/) | ✅ Free | Ultra-fast inference, Llama models |
 | **Anthropic** | [console.anthropic.com](https://console.anthropic.com/) | $5 credit | Claude models (Opus, Sonnet, Haiku) |
 | **ExchangeRate-API** | [exchangerate-api.com](https://www.exchangerate-api.com/) | 1,500 requests/month | Real-time FX rates |
+| **Telegram** | [@BotFather](https://t.me/botfather) | ✅ Free | Create bot, get token |
 
 ### Database Configuration
 
@@ -417,6 +448,47 @@ formatted = format_datetime(
     output_tz="Europe/Madrid"
 )
 print(formatted)  # Output: 17/10/2025 14:30
+```
+
+### Telegram Bot
+
+The project includes a Telegram bot for mobile expense tracking with human-in-the-loop (HITL) category confirmation.
+
+```bash
+# Start the Telegram bot (requires TELEGRAM_BOT_TOKEN in .env)
+expenses-telegram-bot
+```
+
+**Bot Commands:**
+- `/start` - Welcome message and usage instructions
+- `/help` - Show available commands
+- `/cancel` - Cancel current operation
+
+**Usage Flow:**
+1. Send an expense description (e.g., "Coffee at Starbucks $5.50")
+2. Bot classifies and shows suggested category with confidence
+3. Confirm or override the category using inline buttons
+4. Expense is saved to database with your selection
+
+**Environment Variables:**
+```bash
+TELEGRAM_BOT_TOKEN=your-bot-token-from-botfather
+OPENAI_API_KEY=your-openai-key
+DB_URL=sqlite:///expenses.db
+OPENAI_MODEL=gpt-4.1-nano-2025-04-14  # optional
+```
+
+### CLI Commands
+
+```bash
+# Classify an expense (display only)
+expenses-ai-agent classify "Lunch at restaurant for $25"
+
+# Classify and save to database
+expenses-ai-agent classify "Taxi to airport 45 EUR" --db
+
+# Greet command
+expenses-ai-agent greet -g "Your Name"
 ```
 
 ---
@@ -597,8 +669,14 @@ python -m expenses_ai_agent.storage.models
 ### Running Tests
 
 ```bash
-# Run all tests with coverage
+# Run all tests with coverage (96% coverage)
 pytest -vv --cov=src
+
+# Run unit tests only (skip integration tests)
+pytest -vv --cov=src -m "not integration"
+
+# Run integration tests (requires API keys)
+pytest -m integration
 
 # Run specific test file
 pytest tests/unit/test_model.py -v
@@ -615,11 +693,26 @@ ptw
 
 ```
 tests/
-├── unit/
-│   ├── test_model.py      # SQLModel entity tests
-│   └── test_repo.py       # Repository pattern tests
+├── unit/                              # 147 unit tests
+│   ├── test_bot.py                   # Telegram bot setup
+│   ├── test_classification_service.py # Classification service
+│   ├── test_cli.py                   # CLI commands
+│   ├── test_db_repos.py              # DB repositories
+│   ├── test_keyboards.py             # Inline keyboards
+│   ├── test_model.py                 # SQLModel entities
+│   ├── test_openai_assistant.py      # OpenAI client (mocked)
+│   ├── test_preprocessing.py         # Input validation
+│   ├── test_repo.py                  # Repository pattern
+│   ├── test_telegram_exceptions.py   # Exception hierarchy
+│   ├── test_telegram_handlers.py     # Conversation flow
+│   └── test_utils.py                 # Utilities
+├── integration/                       # 5 integration tests
+│   ├── test_currency_integration.py  # Real ExchangeRate API
+│   └── test_openai_integration.py    # Real OpenAI API
 └── __init__.py
 ```
+
+**Coverage:** 96% (152 total tests)
 
 ### Writing Tests
 

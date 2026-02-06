@@ -13,11 +13,9 @@ from sqlmodel import Session, create_engine
 from expenses_ai_agent.llms.base import LLMProvider
 from expenses_ai_agent.llms.openai import OpenAIAssistant
 from expenses_ai_agent.llms.output import ExpenseCategorizationResponse
-from expenses_ai_agent.prompts.system import CLASSIFICATION_PROMPT
-from expenses_ai_agent.prompts.user import USER_PROMPT
-from expenses_ai_agent.storage.exceptions import CategoryNotFoundError
-from expenses_ai_agent.storage.models import Expense, ExpenseCategory
-from expenses_ai_agent.storage.repo import DBCategoryRepo
+from expenses_ai_agent.services.classification import ClassificationService
+from expenses_ai_agent.services.preprocessing import InputPreprocessor
+from expenses_ai_agent.storage.repo import DBCategoryRepo, DBExpenseRepo
 
 DB_URL = config("DB_URL", default="sqlite:///expenses.db")  # type: ignore
 engine = create_engine(DB_URL)  # type: ignore
@@ -69,6 +67,18 @@ def classify(
     ),
 ):
     """Classify an expense using AI assistance."""
+    preprocessor = InputPreprocessor()
+    preprocessing = preprocessor.preprocess(expense)
+
+    if not preprocessing.is_valid:
+        console.print("[red]Invalid input:[/red]")
+        for error in preprocessing.validation_errors:
+            console.print(f"  [red]{error}[/red]")
+        raise typer.Exit(1)
+
+    for warning in preprocessing.warnings:
+        console.print(f"  [yellow]{warning}[/yellow]")
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -86,54 +96,40 @@ def classify(
             structured_output=ExpenseCategorizationResponse,
         )  # type: ignore
 
-        messages = [
-            {"role": "system", "content": CLASSIFICATION_PROMPT},
-            {
-                "role": "user",
-                "content": USER_PROMPT.format(expense_description=expense),
-            },
-        ]
-
-        completion: ExpenseCategorizationResponse = openai_assistant.completion(
-            messages=messages
-        )
-
         if add_to_db:
-            console.print(
-                "Adding classified expense to the database...", style="bold blue"
-            )
-            category: ExpenseCategory = ExpenseCategory(
-                name=completion.category.strip()  # type: ignore
-            )
-            expense_instance: Expense = Expense(
-                amount=completion.total_amount,  # type: ignore
-                currency=completion.currency,  # type: ignore
-                description=expense,
-                category=category,
-            )
-
             with Session(engine) as session:
-                category_repo = DBCategoryRepo(session)  # type: ignore
-                try:
-                    existing_category = category_repo.get(
-                        name=completion.category.strip()
-                    )  # type: ignore
-                    expense_instance.category = existing_category
-                except CategoryNotFoundError:
-                    session.add(category)
-                    session.commit()
-                    session.refresh(category)
-                    expense_instance.category = category
+                category_repo = DBCategoryRepo(DB_URL, session=session)
+                expense_repo = DBExpenseRepo(DB_URL, session=session)
 
-                session.add(expense_instance)
-                session.commit()
-                console.print(
-                    "Expense added to the database successfully!", style="bold green"
+                service = ClassificationService(
+                    assistant=openai_assistant,
+                    category_repo=category_repo,
+                    expense_repo=expense_repo,
                 )
+                result = service.classify(
+                    expense_description=preprocessing.cleaned_text,
+                    persist=True,
+                )
+                console.print(
+                    "Expense added to the database successfully!",
+                    style="bold green",
+                )
+        else:
+            service = ClassificationService(assistant=openai_assistant)
+            result = service.classify(
+                expense_description=preprocessing.cleaned_text,
+                persist=False,
+            )
 
         console.print(
-            Panel("Expense classified successfully!", title="Success", box=box.ROUNDED)
+            Panel(
+                "Expense classified successfully!",
+                title="Success",
+                box=box.ROUNDED,
+            )
         )
+
+    completion = result.response
 
     # Display classification result
     table = Table(title="Expense Classification Result", box=box.ROUNDED)
@@ -146,11 +142,11 @@ def classify(
 
     table.add_row(
         expense,
-        completion.category,  # type: ignore
-        str(completion.total_amount),  # type: ignore
-        completion.currency.value,  # type: ignore
-        f"{completion.confidence:.2f}",  # type: ignore
-        f"${completion.cost:.6f}",  # type: ignore
+        completion.category,
+        str(completion.total_amount),
+        completion.currency.value,
+        f"{completion.confidence:.2f}",
+        f"${completion.cost:.6f}",
     )
 
     console.print(table)

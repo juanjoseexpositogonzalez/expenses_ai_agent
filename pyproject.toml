@@ -13,6 +13,7 @@ dependencies = [
     "openai>=1.109.1",
     "pydantic>=2.11.9",
     "python-decouple>=3.8",
+    "python-telegram-bot>=21.11.0",
     "rich>=14.1.0",
     "sqlmodel>=0.0.25",
     "typer>=0.20.0",
@@ -20,6 +21,7 @@ dependencies = [
 
 [project.scripts]
 expenses-ai-agent = "expenses_ai_agent:main"
+expenses-telegram-bot = "expenses_ai_agent.telegram.bot:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -29,6 +31,7 @@ build-backend = "hatchling.build"
 dev = [
     "logfire>=4.10.0",
     "poethepoet>=0.37.0",
+    "pytest-asyncio>=0.25.0",
     "pytest-coverage>=0.0",
     "pytest-mock>=3.15.1",
     "ty>=0.0.1a21",
@@ -36,3 +39,10 @@ dev = [
 
 [tool.poe.tasks]
 test = "pytest -vv --cov=src"
+test-integration = "pytest -vv -m integration"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests that require real API calls (deselect with '-m \"not integration\"')",
+]
