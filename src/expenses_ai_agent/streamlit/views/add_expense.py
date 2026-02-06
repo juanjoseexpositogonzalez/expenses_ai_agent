@@ -63,10 +63,31 @@ def render() -> None:
 
             except Exception as e:
                 error_msg = str(e)
+
+                # Parse httpx error to extract API detail message
+                if hasattr(e, "response"):
+                    try:
+                        detail = e.response.json().get("detail", "")  # type: ignore[union-attr]
+                        if "total_amount" in str(detail):
+                            st.error(
+                                "Could not extract an amount from your description. "
+                                "Please include a price (e.g., '$5.50' or '25 EUR')."
+                            )
+                            return
+                        if detail:
+                            st.error(f"Error: {detail}")
+                            return
+                    except Exception:
+                        pass
+
+                # Fallback error messages
                 if "400" in error_msg:
                     st.error("Invalid input. Please check your expense description.")
                 elif "500" in error_msg:
-                    st.error("Classification failed. Please try again.")
+                    st.error(
+                        "Classification failed. Make sure your description includes "
+                        "a clear amount (e.g., '$5.50', '25 EUR')."
+                    )
                 else:
                     st.error(f"Error: {e}")
 
