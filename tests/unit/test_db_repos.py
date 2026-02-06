@@ -14,11 +14,14 @@ from expenses_ai_agent.storage.exceptions import (
     ExpenseNotFoundError,
 )
 from expenses_ai_agent.storage.models import Currency, Expense, ExpenseCategory
+from expenses_ai_agent.storage.models import UserPreference
 from expenses_ai_agent.storage.repo import (
     DBCategoryRepo,
     DBExpenseRepo,
+    DBUserPreferenceRepo,
     InMemoryCategoryRepository,
     InMemoryExpenseRepository,
+    InMemoryUserPreferenceRepo,
 )
 
 DATABASE_URL: Final[str] = "sqlite:///:memory:"
@@ -738,3 +741,117 @@ class TestDBReposOwnsSession:
         repo3 = DBExpenseRepo(temp_db_url)
         with pytest.raises(ExpenseNotFoundError):
             repo3.get(1)
+
+
+class TestInMemoryUserPreferenceRepo:
+    """Tests for InMemoryUserPreferenceRepo."""
+
+    def test_get_nonexistent_returns_none(self) -> None:
+        """Test that getting nonexistent preference returns None."""
+        repo = InMemoryUserPreferenceRepo()
+        result = repo.get_by_user_id(12345)
+        assert result is None
+
+    def test_upsert_creates_new(self) -> None:
+        """Test that upsert creates new preference."""
+        repo = InMemoryUserPreferenceRepo()
+        pref = repo.upsert(12345, Currency.USD)
+        assert pref.telegram_user_id == 12345
+        assert pref.preferred_currency == Currency.USD
+
+    def test_upsert_updates_existing(self) -> None:
+        """Test that upsert updates existing preference."""
+        repo = InMemoryUserPreferenceRepo()
+        repo.upsert(12345, Currency.USD)
+        updated = repo.upsert(12345, Currency.GBP)
+        assert updated.preferred_currency == Currency.GBP
+
+    def test_get_after_upsert(self) -> None:
+        """Test get returns correct preference after upsert."""
+        repo = InMemoryUserPreferenceRepo()
+        repo.upsert(12345, Currency.EUR)
+        result = repo.get_by_user_id(12345)
+        assert result is not None
+        assert result.preferred_currency == Currency.EUR
+
+
+class TestDBUserPreferenceRepo:
+    """Tests for DBUserPreferenceRepo with injected session."""
+
+    def test_get_nonexistent_returns_none(self, db_session: Session) -> None:
+        """Test that getting nonexistent preference returns None."""
+        repo = DBUserPreferenceRepo(DATABASE_URL, session=db_session)
+        result = repo.get_by_user_id(12345)
+        assert result is None
+
+    def test_upsert_creates_new(self, db_session: Session) -> None:
+        """Test that upsert creates new preference."""
+        repo = DBUserPreferenceRepo(DATABASE_URL, session=db_session)
+        pref = repo.upsert(12345, Currency.USD)
+        assert pref.id is not None
+        assert pref.telegram_user_id == 12345
+        assert pref.preferred_currency == Currency.USD
+
+    def test_upsert_updates_existing(self, db_session: Session) -> None:
+        """Test that upsert updates existing preference."""
+        repo = DBUserPreferenceRepo(DATABASE_URL, session=db_session)
+        repo.upsert(12345, Currency.USD)
+        updated = repo.upsert(12345, Currency.GBP)
+        assert updated.preferred_currency == Currency.GBP
+
+    def test_get_after_upsert(self, db_session: Session) -> None:
+        """Test get returns correct preference after upsert."""
+        repo = DBUserPreferenceRepo(DATABASE_URL, session=db_session)
+        repo.upsert(12345, Currency.EUR)
+        result = repo.get_by_user_id(12345)
+        assert result is not None
+        assert result.preferred_currency == Currency.EUR
+
+
+class TestDBUserPreferenceRepoOwnsSession:
+    """Tests for DBUserPreferenceRepo with _owns_session=True."""
+
+    @pytest.fixture(scope="function")
+    def temp_db_url(self, tmp_path) -> str:
+        """Create a temporary database URL."""
+        db_path = tmp_path / "test_user_pref.db"
+        return f"sqlite:///{db_path}"
+
+    def test_owns_session_crud(self, temp_db_url: str) -> None:
+        """Test user preference repo with owns_session."""
+        from sqlmodel import SQLModel, create_engine
+
+        engine = create_engine(temp_db_url)
+        SQLModel.metadata.create_all(engine)
+
+        repo = DBUserPreferenceRepo(temp_db_url)
+        assert repo._owns_session is True
+
+        # Create
+        repo.upsert(12345, Currency.JPY)
+
+        # Get with new repo
+        repo2 = DBUserPreferenceRepo(temp_db_url)
+        result = repo2.get_by_user_id(12345)
+        assert result is not None
+        assert result.preferred_currency == Currency.JPY
+
+    def test_owns_session_update(self, temp_db_url: str) -> None:
+        """Test user preference repo update with owns_session."""
+        from sqlmodel import SQLModel, create_engine
+
+        engine = create_engine(temp_db_url)
+        SQLModel.metadata.create_all(engine)
+
+        repo = DBUserPreferenceRepo(temp_db_url)
+        repo.upsert(12345, Currency.USD)
+
+        # Update with new repo
+        repo2 = DBUserPreferenceRepo(temp_db_url)
+        repo2.upsert(12345, Currency.CAD)
+
+        # Verify with another repo
+        repo3 = DBUserPreferenceRepo(temp_db_url)
+        result = repo3.get_by_user_id(12345)
+        assert result is not None
+        assert result.preferred_currency == Currency.CAD

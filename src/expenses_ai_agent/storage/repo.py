@@ -9,7 +9,12 @@ from expenses_ai_agent.storage.exceptions import (
     CategoryNotFoundError,
     ExpenseNotFoundError,
 )
-from expenses_ai_agent.storage.models import Expense, ExpenseCategory
+from expenses_ai_agent.storage.models import (
+    Currency,
+    Expense,
+    ExpenseCategory,
+    UserPreference,
+)
 
 
 class CategoryRepository(ABC):
@@ -499,3 +504,150 @@ class DBExpenseRepo(ExpenseRepository):
             results = self.session.exec(statement)
             expenses = results.all()
             return expenses
+
+
+class UserPreferenceRepository(ABC):
+    """Abstract base class for user preference repositories."""
+
+    @abstractmethod
+    def get_by_user_id(self, telegram_user_id: int) -> UserPreference | None:
+        """Get user preference by Telegram user ID.
+
+        Args:
+            telegram_user_id: The Telegram user ID.
+
+        Returns:
+            UserPreference if found, None otherwise.
+        """
+
+    @abstractmethod
+    def upsert(self, telegram_user_id: int, currency: Currency) -> UserPreference:
+        """Create or update a user preference.
+
+        Args:
+            telegram_user_id: The Telegram user ID.
+            currency: The preferred currency.
+
+        Returns:
+            The created or updated UserPreference.
+        """
+
+
+class InMemoryUserPreferenceRepo(UserPreferenceRepository):
+    """In-memory implementation of UserPreferenceRepository."""
+
+    def __init__(self) -> None:
+        self.preferences: Dict[int, UserPreference] = {}
+
+    def get_by_user_id(self, telegram_user_id: int) -> UserPreference | None:
+        return self.preferences.get(telegram_user_id)
+
+    def upsert(self, telegram_user_id: int, currency: Currency) -> UserPreference:
+        from datetime import datetime, timezone
+
+        existing = self.preferences.get(telegram_user_id)
+        if existing:
+            existing.preferred_currency = currency
+            existing.updated_at = datetime.now(timezone.utc)
+            return existing
+        else:
+            pref = UserPreference(
+                telegram_user_id=telegram_user_id,
+                preferred_currency=currency,
+            )
+            self.preferences[telegram_user_id] = pref
+            return pref
+
+
+class DBUserPreferenceRepo(UserPreferenceRepository):
+    """Database implementation of UserPreferenceRepository."""
+
+    def __init__(self, db_url: str, session: Session | None = None) -> None:
+        """Initialize the repository with an optional SQLModel session."""
+        if session:
+            self.session = session
+            self.engine = None
+            self._owns_session = False
+        else:
+            self.engine = create_engine(db_url)
+            self.session = Session(self.engine)
+            self._owns_session = True
+
+    def __enter__(self):  # pragma: no cover
+        """Enter the context manager."""
+        return self
+
+    def __exit__(
+        self, exc_type: str | None, exc_val: int, ext_tb: str | None
+    ) -> None:  # pragma: no cover
+        """Exit the context manager."""
+        if self._owns_session:
+            self.session.close()
+
+    def get_by_user_id(self, telegram_user_id: int) -> UserPreference | None:
+        """Get user preference by Telegram user ID."""
+        if self._owns_session:
+            with self.session as session:
+                statement = select(UserPreference).where(
+                    UserPreference.telegram_user_id == telegram_user_id
+                )
+                results = session.exec(statement)
+                return results.first()
+        else:
+            statement = select(UserPreference).where(
+                UserPreference.telegram_user_id == telegram_user_id
+            )
+            results = self.session.exec(statement)
+            return results.first()
+
+    def upsert(self, telegram_user_id: int, currency: Currency) -> UserPreference:
+        """Create or update a user preference."""
+        from datetime import datetime, timezone
+
+        if self._owns_session:
+            with self.session as session:
+                statement = select(UserPreference).where(
+                    UserPreference.telegram_user_id == telegram_user_id
+                )
+                results = session.exec(statement)
+                existing = results.first()
+
+                if existing:
+                    existing.preferred_currency = currency
+                    existing.updated_at = datetime.now(timezone.utc)
+                    session.add(existing)
+                    session.commit()
+                    session.refresh(existing)
+                    return existing
+                else:
+                    pref = UserPreference(
+                        telegram_user_id=telegram_user_id,
+                        preferred_currency=currency,
+                    )
+                    session.add(pref)
+                    session.commit()
+                    session.refresh(pref)
+                    return pref
+        else:
+            statement = select(UserPreference).where(
+                UserPreference.telegram_user_id == telegram_user_id
+            )
+            results = self.session.exec(statement)
+            existing = results.first()
+
+            if existing:
+                existing.preferred_currency = currency
+                existing.updated_at = datetime.now(timezone.utc)
+                self.session.add(existing)
+                self.session.commit()
+                self.session.refresh(existing)
+                return existing
+            else:
+                pref = UserPreference(
+                    telegram_user_id=telegram_user_id,
+                    preferred_currency=currency,
+                )
+                self.session.add(pref)
+                self.session.commit()
+                self.session.refresh(pref)
+                return pref

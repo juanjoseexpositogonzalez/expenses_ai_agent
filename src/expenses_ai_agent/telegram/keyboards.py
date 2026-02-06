@@ -1,6 +1,23 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from expenses_ai_agent.storage.models import Currency
+
 CATEGORY_CALLBACK_PREFIX = "category:"
+CURRENCY_CALLBACK_PREFIX = "setcurrency:"
+
+# Currency symbols for display
+CURRENCY_SYMBOLS: dict[Currency, str] = {
+    Currency.USD: "$",
+    Currency.EUR: "€",
+    Currency.GBP: "£",
+    Currency.JPY: "¥",
+    Currency.AUD: "A$",
+    Currency.CAD: "C$",
+    Currency.CHF: "Fr",
+    Currency.CNY: "¥",
+    Currency.SEK: "kr",
+    Currency.NZD: "NZ$",
+}
 
 ALL_CATEGORIES: list[str] = [
     "Food & Dining",
@@ -64,5 +81,54 @@ def build_category_confirmation_keyboard(
     ]
     if alt_buttons:
         keyboard.append(alt_buttons)
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+def build_currency_selection_keyboard(
+    current_currency: Currency | None = None,
+) -> InlineKeyboardMarkup:
+    """Build an inline keyboard for currency selection.
+
+    Displays 10 currencies in a 3-3-3-1 layout.
+    The current selection is highlighted with a checkmark.
+
+    Args:
+        current_currency: The user's current preferred currency.
+
+    Returns:
+        Ready-to-use InlineKeyboardMarkup.
+    """
+    currencies = list(Currency)
+    keyboard: list[list[InlineKeyboardButton]] = []
+
+    # Layout: 3-3-3-1
+    row_sizes = [3, 3, 3, 1]
+    idx = 0
+
+    for row_size in row_sizes:
+        row: list[InlineKeyboardButton] = []
+        for _ in range(row_size):
+            if idx >= len(currencies):
+                break
+            curr = currencies[idx]
+            symbol = CURRENCY_SYMBOLS.get(curr, "")
+
+            # Highlight current selection
+            if curr == current_currency:
+                label = f"✅ {symbol} {curr.value}"
+            else:
+                label = f"{symbol} {curr.value}"
+
+            row.append(
+                InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"{CURRENCY_CALLBACK_PREFIX}{curr.value}",
+                )
+            )
+            idx += 1
+
+        if row:
+            keyboard.append(row)
 
     return InlineKeyboardMarkup(keyboard)

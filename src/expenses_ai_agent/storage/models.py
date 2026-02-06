@@ -108,6 +108,21 @@ def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
 
+class UserPreference(SQLModel, table=True):
+    """Model representing user preferences for the Telegram bot."""
+
+    __table_args__ = {"extend_existing": True}
+
+    id: int | None = Field(default=None, primary_key=True)
+    telegram_user_id: int = Field(unique=True, index=True)
+    preferred_currency: Currency = Field(default=Currency.EUR)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def __str__(self) -> str:
+        return f"UserPreference: {self.telegram_user_id} - {self.preferred_currency}"
+
+
 if __name__ == "__main__":
     create_db_and_tables()
     logger.info("Database and tables created successfully.")

@@ -9,12 +9,16 @@ from expenses_ai_agent.llms.output import ExpenseCategorizationResponse
 from expenses_ai_agent.storage.models import Currency
 from expenses_ai_agent.telegram.handlers import (
     WAITING_FOR_CONFIRMATION,
+    CurrencyHandler,
     ExpenseConversationHandler,
     cancel_command,
     help_command,
     start_command,
 )
-from expenses_ai_agent.telegram.keyboards import CATEGORY_CALLBACK_PREFIX
+from expenses_ai_agent.telegram.keyboards import (
+    CATEGORY_CALLBACK_PREFIX,
+    CURRENCY_CALLBACK_PREFIX,
+)
 
 
 # ------------------------------------------------------------------
@@ -135,11 +139,30 @@ async def test_handle_expense_text_invalid_input() -> None:
 
 
 @pytest.mark.asyncio
+@patch("expenses_ai_agent.telegram.handlers.DBUserPreferenceRepo")
+@patch("expenses_ai_agent.telegram.handlers.Session")
+@patch("expenses_ai_agent.telegram.handlers.create_engine")
 @patch("expenses_ai_agent.telegram.handlers.OpenAIAssistant")
-async def test_handle_expense_text_success(mock_assistant_cls: Mock) -> None:
+async def test_handle_expense_text_success(
+    mock_assistant_cls: Mock,
+    mock_create_engine: Mock,
+    mock_session_cls: Mock,
+    mock_pref_repo_cls: Mock,
+) -> None:
     mock_instance = Mock()
     mock_instance.completion.return_value = _make_llm_response()
     mock_assistant_cls.return_value = mock_instance
+
+    # Mock session context manager
+    mock_session = Mock()
+    mock_session.__enter__ = Mock(return_value=mock_session)
+    mock_session.__exit__ = Mock(return_value=False)
+    mock_session_cls.return_value = mock_session
+
+    # Mock user preference repo
+    mock_pref_repo = Mock()
+    mock_pref_repo.get_by_user_id.return_value = None  # No preference set
+    mock_pref_repo_cls.return_value = mock_pref_repo
 
     # reply_text returns a message that supports .delete()
     processing_msg = Mock()
@@ -291,3 +314,187 @@ def test_build_returns_conversation_handler() -> None:
     conv = handler.build()
 
     assert isinstance(conv, ConversationHandler)
+
+
+# ------------------------------------------------------------------
+# CurrencyHandler tests
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@patch("expenses_ai_agent.telegram.handlers.create_engine")
+@patch("expenses_ai_agent.telegram.handlers.Session")
+@patch("expenses_ai_agent.telegram.handlers.DBUserPreferenceRepo")
+async def test_currency_command_shows_keyboard(
+    mock_repo_cls: Mock,
+    mock_session_cls: Mock,
+    mock_create_engine: Mock,
+) -> None:
+    """Test that /currency command shows currency selection keyboard."""
+    mock_session = Mock()
+    mock_session.__enter__ = Mock(return_value=mock_session)
+    mock_session.__exit__ = Mock(return_value=False)
+    mock_session_cls.return_value = mock_session
+
+    mock_repo = Mock()
+    mock_repo.get_by_user_id.return_value = None  # No existing preference
+    mock_repo_cls.return_value = mock_repo
+
+    update = _make_update()
+    ctx = _make_context()
+
+    handler = CurrencyHandler(db_url="sqlite:///:memory:")
+    await handler.currency_command(update, ctx)
+
+    update.message.reply_text.assert_called_once()
+    call_kwargs = update.message.reply_text.call_args
+    assert "currency" in call_kwargs[0][0].lower()
+    assert call_kwargs[1]["reply_markup"] is not None
+
+
+@pytest.mark.asyncio
+@patch("expenses_ai_agent.telegram.handlers.create_engine")
+@patch("expenses_ai_agent.telegram.handlers.Session")
+@patch("expenses_ai_agent.telegram.handlers.DBUserPreferenceRepo")
+async def test_currency_command_shows_current_preference(
+    mock_repo_cls: Mock,
+    mock_session_cls: Mock,
+    mock_create_engine: Mock,
+) -> None:
+    """Test that /currency command shows current preference."""
+    mock_session = Mock()
+    mock_session.__enter__ = Mock(return_value=mock_session)
+    mock_session.__exit__ = Mock(return_value=False)
+    mock_session_cls.return_value = mock_session
+
+    # Mock existing preference
+    mock_pref = Mock()
+    mock_pref.preferred_currency = Currency.GBP
+    mock_repo = Mock()
+    mock_repo.get_by_user_id.return_value = mock_pref
+    mock_repo_cls.return_value = mock_repo
+
+    update = _make_update()
+    ctx = _make_context()
+
+    handler = CurrencyHandler(db_url="sqlite:///:memory:")
+    await handler.currency_command(update, ctx)
+
+    text = update.message.reply_text.call_args[0][0]
+    assert "GBP" in text
+
+
+@pytest.mark.asyncio
+async def test_currency_command_no_user() -> None:
+    """Test that /currency command does nothing when no user."""
+    update = _make_update()
+    update.effective_user = None
+    ctx = _make_context()
+
+    handler = CurrencyHandler(db_url="sqlite:///:memory:")
+    await handler.currency_command(update, ctx)
+
+    # Should return early without calling reply_text
+    update.message.reply_text.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch("expenses_ai_agent.telegram.handlers.create_engine")
+@patch("expenses_ai_agent.telegram.handlers.Session")
+@patch("expenses_ai_agent.telegram.handlers.DBUserPreferenceRepo")
+async def test_handle_currency_selection_success(
+    mock_repo_cls: Mock,
+    mock_session_cls: Mock,
+    mock_create_engine: Mock,
+) -> None:
+    """Test currency selection saves preference."""
+    mock_session = Mock()
+    mock_session.__enter__ = Mock(return_value=mock_session)
+    mock_session.__exit__ = Mock(return_value=False)
+    mock_session_cls.return_value = mock_session
+
+    mock_repo = Mock()
+    mock_repo_cls.return_value = mock_repo
+
+    data = f"{CURRENCY_CALLBACK_PREFIX}USD"
+    update = _make_callback_update(data=data)
+    ctx = _make_context()
+
+    handler = CurrencyHandler(db_url="sqlite:///:memory:")
+    await handler.handle_currency_selection(update, ctx)
+
+    mock_repo.upsert.assert_called_once_with(123, Currency.USD)
+    text = update.callback_query.edit_message_text.call_args[0][0]
+    assert "USD" in text
+    assert "set to" in text.lower()
+
+
+@pytest.mark.asyncio
+async def test_handle_currency_selection_invalid_callback() -> None:
+    """Test that invalid callback is ignored."""
+    update = _make_callback_update(data="invalid:data")
+    ctx = _make_context()
+
+    handler = CurrencyHandler(db_url="sqlite:///:memory:")
+    await handler.handle_currency_selection(update, ctx)
+
+    # Should return early without calling edit_message_text
+    update.callback_query.edit_message_text.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handle_currency_selection_invalid_currency() -> None:
+    """Test that invalid currency shows error."""
+    data = f"{CURRENCY_CALLBACK_PREFIX}INVALID"
+    update = _make_callback_update(data=data)
+    ctx = _make_context()
+
+    handler = CurrencyHandler(db_url="sqlite:///:memory:")
+    await handler.handle_currency_selection(update, ctx)
+
+    text = update.callback_query.edit_message_text.call_args[0][0]
+    assert "invalid" in text.lower()
+
+
+@pytest.mark.asyncio
+async def test_handle_currency_selection_no_user() -> None:
+    """Test that no user shows error."""
+    data = f"{CURRENCY_CALLBACK_PREFIX}USD"
+    update = _make_callback_update(data=data)
+    update.effective_user = None
+    ctx = _make_context()
+
+    handler = CurrencyHandler(db_url="sqlite:///:memory:")
+    await handler.handle_currency_selection(update, ctx)
+
+    text = update.callback_query.edit_message_text.call_args[0][0]
+    assert "identify user" in text.lower()
+
+
+# ------------------------------------------------------------------
+# Test help/start mention /currency
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_help_command_mentions_currency() -> None:
+    """Test that help command mentions /currency."""
+    update = _make_update()
+    ctx = _make_context()
+
+    await help_command(update, ctx)
+
+    text = update.message.reply_text.call_args[0][0]
+    assert "/currency" in text
+
+
+@pytest.mark.asyncio
+async def test_start_command_mentions_currency() -> None:
+    """Test that start command mentions /currency."""
+    update = _make_update()
+    ctx = _make_context()
+
+    await start_command(update, ctx)
+
+    text = update.message.reply_text.call_args[0][0]
+    assert "/currency" in text

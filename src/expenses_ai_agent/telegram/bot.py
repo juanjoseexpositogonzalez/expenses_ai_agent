@@ -2,13 +2,15 @@ import logging
 
 from decouple import config
 from telegram import Update
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler
 
 from expenses_ai_agent.telegram.handlers import (
+    CurrencyHandler,
     ExpenseConversationHandler,
     help_command,
     start_command,
 )
+from expenses_ai_agent.telegram.keyboards import CURRENCY_CALLBACK_PREFIX
 from expenses_ai_agent.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -41,8 +43,20 @@ class ExpenseTelegramBot:
             model=self.model,
         ).build()
 
+        # Currency handler
+        currency_handler = CurrencyHandler(db_url=self.db_url)
+
         self.application.add_handler(CommandHandler("start", start_command))
         self.application.add_handler(CommandHandler("help", help_command))
+        self.application.add_handler(
+            CommandHandler("currency", currency_handler.currency_command)
+        )
+        self.application.add_handler(
+            CallbackQueryHandler(
+                currency_handler.handle_currency_selection,
+                pattern=f"^{CURRENCY_CALLBACK_PREFIX}",
+            )
+        )
         self.application.add_handler(conversation)
         self.application.add_error_handler(self._error_handler)
 

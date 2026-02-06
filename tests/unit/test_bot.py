@@ -59,7 +59,8 @@ class TestExpenseTelegramBot:
         result = bot.setup()
 
         # Verify handlers were added
-        assert mock_app.add_handler.call_count == 3  # start, help, conversation
+        # start, help, currency, currency_callback, conversation = 5
+        assert mock_app.add_handler.call_count == 5
         assert mock_app.add_error_handler.call_count == 1
         assert result == mock_app
 
