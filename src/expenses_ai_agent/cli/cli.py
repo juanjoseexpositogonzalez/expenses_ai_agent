@@ -17,7 +17,7 @@ from expenses_ai_agent.services.classification import ClassificationService
 from expenses_ai_agent.services.preprocessing import InputPreprocessor
 from expenses_ai_agent.storage.repo import DBCategoryRepo, DBExpenseRepo
 
-DB_URL = config("DB_URL", default="sqlite:///expenses.db")  # type: ignore
+DB_URL = config("DATABASE_URL", default="sqlite:///./expenses.db")  # type: ignore
 engine = create_engine(DB_URL)  # type: ignore
 
 logging.basicConfig(level=logging.INFO)

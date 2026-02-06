@@ -89,7 +89,7 @@ def main() -> None:
     setup_logging()
 
     token: str = config("TELEGRAM_BOT_TOKEN")  # type: ignore[assignment]
-    db_url: str = config("DB_URL", default="sqlite:///expenses.db")  # type: ignore[assignment]
+    db_url: str = config("DATABASE_URL", default="sqlite:///./expenses.db")  # type: ignore[assignment]
     openai_api_key: str = config("OPENAI_API_KEY")  # type: ignore[assignment]
     model: str = config("OPENAI_MODEL", default="gpt-4.1-nano-2025-04-14")  # type: ignore[assignment]
 
