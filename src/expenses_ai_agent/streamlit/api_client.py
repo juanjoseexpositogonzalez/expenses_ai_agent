@@ -134,7 +134,9 @@ class APIClient:
             True if API is healthy, False otherwise.
         """
         try:
-            response = self._client.get("/health", timeout=5.0)
+            # Health endpoint is at root, not under /api/v1
+            base = self.base_url.replace("/api/v1", "")
+            response = httpx.get(f"{base}/health", timeout=5.0)
             return response.status_code == 200
         except httpx.HTTPError:
             return False
