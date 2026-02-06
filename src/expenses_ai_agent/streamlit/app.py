@@ -41,14 +41,14 @@ st.sidebar.caption("Powered by AI classification")
 
 # Route to pages
 if page == "Dashboard":
-    from expenses_ai_agent.streamlit.pages.dashboard import render
+    from expenses_ai_agent.streamlit.views.dashboard import render
 
     render()
 elif page == "Expenses":
-    from expenses_ai_agent.streamlit.pages.expenses import render
+    from expenses_ai_agent.streamlit.views.expenses import render
 
     render()
 elif page == "Add Expense":
-    from expenses_ai_agent.streamlit.pages.add_expense import render
+    from expenses_ai_agent.streamlit.views.add_expense import render
 
     render()
