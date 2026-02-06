@@ -10,6 +10,8 @@ from sqlmodel import SQLModel
 
 from expenses_ai_agent.api.deps import engine
 from expenses_ai_agent.api.routes import analytics, categories, expenses, health
+# Import models to ensure they're registered with SQLModel before create_all
+from expenses_ai_agent.storage.models import Expense, ExpenseCategory, UserPreference  # noqa: F401
 
 
 @asynccontextmanager
