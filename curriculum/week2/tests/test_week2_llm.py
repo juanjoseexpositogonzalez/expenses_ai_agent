@@ -14,7 +14,7 @@ These tests verify your implementation of:
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Dict, List, Protocol, Sequence
+from typing import Protocol
 
 import pytest
 
@@ -160,7 +160,7 @@ class TestTypeAliases:
         """MESSAGES type alias should be defined."""
         from expenses_ai_agent.llms.base import MESSAGES
 
-        # MESSAGES should be a type alias for List[Dict[str, str]]
+        # MESSAGES should be a type alias for list[dict[str, str]]
         # We can verify it accepts the expected structure
         sample_messages: MESSAGES = [
             {"role": "system", "content": "You are a helpful assistant."},
@@ -172,7 +172,7 @@ class TestTypeAliases:
         """COST type alias should be defined."""
         from expenses_ai_agent.llms.base import COST
 
-        # COST should be a type alias for Dict[str, List[Decimal]]
+        # COST should be a type alias for dict[str, list[Decimal]]
         sample_cost: COST = {
             "prompt": [Decimal("0.001"), Decimal("0.002")],
             "completion": [Decimal("0.003")],

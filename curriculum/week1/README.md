@@ -198,7 +198,7 @@ class Currency(StrEnum):
 class ExpenseCategory(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
-    expenses: List["Expense"] = Relationship(back_populates="category")
+    expenses: list["Expense"] = Relationship(back_populates="category")
 
 class Expense(SQLModel, table=True):
     category_id: int | None = Field(default=None, foreign_key="expensecategory.id")

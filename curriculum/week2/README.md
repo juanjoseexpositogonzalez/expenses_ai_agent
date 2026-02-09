@@ -114,20 +114,19 @@ class Assistant(Protocol):
 ### 2. Type Aliases for Cleaner Code
 
 ```python
-from typing import Dict, List
 from decimal import Decimal
 
 # Type alias for chat messages
-MESSAGES = List[Dict[str, str]]
+MESSAGES = list[dict[str, str]]
 
 # Type alias for cost tracking
-COST = Dict[str, List[Decimal]]
+COST = dict[str, list[Decimal]]
 ```
 
 Usage:
 ```python
 def completion(self, messages: MESSAGES) -> ExpenseCategorizationResponse:
-    # messages is List[Dict[str, str]]
+    # messages is list[dict[str, str]]
     pass
 ```
 
