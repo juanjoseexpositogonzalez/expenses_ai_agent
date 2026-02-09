@@ -87,6 +87,36 @@ class TestFormatDatetime:
         # Already in Europe/Madrid summer time
         assert result == "15/06/2024 14:00"
 
+    def test_format_datetime_z_suffix_conversion(self) -> None:
+        """Test Z suffix is properly converted to +00:00."""
+        result = format_datetime("2024-12-25T12:00:00Z", output_tz="UTC")
+        assert result == "25/12/2024 12:00"
+
+    def test_format_datetime_naive_datetime_no_tz(self) -> None:
+        """Test naive datetime without explicit timezone falls back to output_tz."""
+        # This specifically tests the ValueError path and naive datetime handling
+        result = format_datetime("2024-11-10T08:30:00", output_tz="America/Los_Angeles")
+        # Should assume America/Los_Angeles timezone
+        assert result == "10/11/2024 08:30"
+
+    def test_format_datetime_with_microseconds(self) -> None:
+        """Test datetime with microseconds is handled correctly."""
+        result = format_datetime("2024-05-20T15:45:30.123456Z", output_tz="Europe/London")
+        # Z is UTC, Europe/London in May is UTC+1 (BST)
+        assert result == "20/05/2024 16:45"
+
+    def test_format_datetime_negative_offset(self) -> None:
+        """Test datetime with negative timezone offset."""
+        result = format_datetime("2024-08-01T10:00:00-05:00", output_tz="UTC")
+        # -05:00 to UTC means add 5 hours
+        assert result == "01/08/2024 15:00"
+
+    def test_format_datetime_tokyo_timezone(self) -> None:
+        """Test conversion to Asia/Tokyo timezone."""
+        result = format_datetime("2024-01-01T00:00:00Z", output_tz="Asia/Tokyo")
+        # UTC to Asia/Tokyo is +9 hours
+        assert result == "01/01/2024 09:00"
+
 
 class TestConvertCurrency:
     """Tests for convert_currency function."""

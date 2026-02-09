@@ -48,6 +48,7 @@ dev = [
 [tool.poe.tasks]
 test = "pytest -vv --cov=src"
 test-integration = "pytest -vv -m integration"
+test-validate = "pytest --cov=src --cov-fail-under=95"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
