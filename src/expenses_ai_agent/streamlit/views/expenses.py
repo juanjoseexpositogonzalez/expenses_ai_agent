@@ -36,7 +36,9 @@ def render() -> None:
     pages = data["pages"]
 
     # Summary
-    st.info(f"Showing {len(items)} of {total} expenses (Page {st.session_state.expense_page}/{pages})")
+    st.info(
+        f"Showing {len(items)} of {total} expenses (Page {st.session_state.expense_page}/{pages})"
+    )
 
     if not items:
         st.warning("No expenses found. Add your first expense!")

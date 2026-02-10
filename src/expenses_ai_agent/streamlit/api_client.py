@@ -1,6 +1,5 @@
 """HTTP client for FastAPI backend."""
 
-from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -45,9 +44,7 @@ class APIClient:
     # Expenses
     # ------------------------------------------------------------------
 
-    def list_expenses(
-        self, page: int = 1, page_size: int = 20
-    ) -> dict[str, Any]:
+    def list_expenses(self, page: int = 1, page_size: int = 20) -> dict[str, Any]:
         """List expenses with pagination.
 
         Args:

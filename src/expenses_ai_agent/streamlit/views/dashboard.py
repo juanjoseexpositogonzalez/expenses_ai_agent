@@ -105,7 +105,13 @@ def render() -> None:
 
             # Select columns to display
             display_df = df[["date", "description", "category", "amount", "currency"]]
-            display_df.columns = ["Date", "Description", "Category", "Amount", "Currency"]
+            display_df.columns = [
+                "Date",
+                "Description",
+                "Category",
+                "Amount",
+                "Currency",
+            ]
 
             st.dataframe(display_df, use_container_width=True, hide_index=True)
         else:

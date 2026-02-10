@@ -48,13 +48,6 @@ def render() -> None:
 
                 with col2:
                     confidence = result["confidence"]
-                    confidence_color = (
-                        "green"
-                        if confidence > 0.8
-                        else "orange"
-                        if confidence > 0.5
-                        else "red"
-                    )
                     st.metric("Confidence", f"{confidence:.0%}")
                     st.metric("Expense ID", result["id"])
 

@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Sequence
 
-from sqlmodel import Session, create_engine, func, select
+from sqlmodel import Session, create_engine, select
 
 from expenses_ai_agent.storage.exceptions import (
     CategoryCreationError,
@@ -301,8 +301,7 @@ class InMemoryExpenseRepository(ExpenseRepository):
 
     def list_by_user(self, telegram_user_id: int) -> Sequence[Expense]:
         return [
-            e for e in self.expenses.values()
-            if e.telegram_user_id == telegram_user_id
+            e for e in self.expenses.values() if e.telegram_user_id == telegram_user_id
         ]
 
     def get_monthly_totals(
@@ -326,13 +325,17 @@ class InMemoryExpenseRepository(ExpenseRepository):
         totals: Dict[str, Decimal] = defaultdict(Decimal)
 
         for expense in user_expenses:
-            category_name = expense.category.name if expense.category else "Uncategorized"
+            category_name = (
+                expense.category.name if expense.category else "Uncategorized"
+            )
             totals[category_name] += expense.amount
 
         return list(totals.items())
 
     def get_unique_user_ids(self) -> Sequence[int]:
-        user_ids = {e.telegram_user_id for e in self.expenses.values() if e.telegram_user_id}
+        user_ids = {
+            e.telegram_user_id for e in self.expenses.values() if e.telegram_user_id
+        }
         return sorted(user_ids)
 
 
@@ -627,7 +630,9 @@ class DBExpenseRepo(ExpenseRepository):
         totals: Dict[str, Decimal] = defaultdict(Decimal)
 
         for expense in expenses:
-            category_name = expense.category.name if expense.category else "Uncategorized"
+            category_name = (
+                expense.category.name if expense.category else "Uncategorized"
+            )
             totals[category_name] += expense.amount
 
         return list(totals.items())
@@ -636,14 +641,22 @@ class DBExpenseRepo(ExpenseRepository):
         """Get list of unique user IDs that have expenses."""
         if self._owns_session:
             with self.session as session:
-                statement = select(Expense.telegram_user_id).distinct().where(
-                    Expense.telegram_user_id.isnot(None)  # type: ignore[union-attr]
+                statement = (
+                    select(Expense.telegram_user_id)
+                    .distinct()
+                    .where(
+                        Expense.telegram_user_id.isnot(None)  # type: ignore[union-attr]
+                    )
                 )
                 results = session.exec(statement)
                 return sorted(results.all())
         else:
-            statement = select(Expense.telegram_user_id).distinct().where(
-                Expense.telegram_user_id.isnot(None)  # type: ignore[union-attr]
+            statement = (
+                select(Expense.telegram_user_id)
+                .distinct()
+                .where(
+                    Expense.telegram_user_id.isnot(None)  # type: ignore[union-attr]
+                )
             )
             results = self.session.exec(statement)
             return sorted(results.all())

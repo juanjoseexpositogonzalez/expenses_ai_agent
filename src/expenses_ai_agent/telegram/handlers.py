@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 from telegram import Update
 from telegram.ext import (
@@ -345,7 +346,9 @@ class ExpenseConversationHandler:
 
         user = update.effective_user
         telegram_user_id = user.id if user else None
-        logger.info("User %s selected category: %s", telegram_user_id, selected_category)
+        logger.info(
+            "User %s selected category: %s", telegram_user_id, selected_category
+        )
 
         try:
             engine = create_engine(self.db_url)

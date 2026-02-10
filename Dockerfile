@@ -19,14 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for fast package management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Copy dependency files
+# Copy dependency files and source code
 COPY pyproject.toml uv.lock ./
+COPY src/ ./src/
 
 # Install dependencies (no dev dependencies in production)
-RUN uv pip install --system --no-cache -e .
-
-# Copy application code
-COPY src/ ./src/
+RUN uv pip install --system --no-cache .
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data

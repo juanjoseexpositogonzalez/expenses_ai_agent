@@ -4,7 +4,7 @@ from collections.abc import Generator
 from typing import Annotated
 
 from decouple import config
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header
 from sqlmodel import Session, create_engine
 
 from expenses_ai_agent.llms.base import LLMProvider
@@ -31,7 +31,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 
 def get_user_id(
-    x_user_id: Annotated[int | None, Header(alias="X-User-ID")] = None
+    x_user_id: Annotated[int | None, Header(alias="X-User-ID")] = None,
 ) -> int:
     """Get user ID from header or use default.
 
