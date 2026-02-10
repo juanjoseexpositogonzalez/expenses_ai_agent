@@ -2,6 +2,7 @@
 
 Welcome to the Expense AI Agent Cohort! This 6-week curriculum teaches you to build a production-ready AI-powered expense tracking system using Python.
 
+
 ## Overview
 
 You will build an intelligent expense classification agent that:
@@ -12,45 +13,38 @@ You will build an intelligent expense classification agent that:
 - Persists data to SQLite with the Repository pattern
 - Deploys with Docker and CI/CD
 
+
 ## Curriculum Structure
+
+Each week contains multiple lesson files:
 
 ```
 curriculum/
-+-- README.md              # This file
++-- README.md                      # This file
++-- agentic_ai_sales_strategy.md   # Sales enablement guide
 +-- week1/
-|   +-- README.md          # Week 1 overview and build guide
-|   +-- tests/
-|       +-- test_week1_models.py
-|       +-- test_week1_repos.py
+|   +-- 01-welcome.md              # Week overview, objectives
+|   +-- 02-join-the-community.md   # Community onboarding
+|   +-- 03-environment-setup.md    # Dev environment setup
+|   +-- 04-repository-pattern.md   # Concept: Repository pattern
+|   +-- 05-sqlmodel-entities.md    # Concept: SQLModel
+|   +-- 06-python-enums.md         # Concept: StrEnum
+|   +-- 07-week1-implementation.md # Implementation with tests
+|   +-- 08-success-criteria.md     # Validation checklist
+|   +-- 09-looking-ahead.md        # Preview of next week
 +-- week2/
-|   +-- README.md
-|   +-- tests/
-|       +-- test_week2_llm.py
-|       +-- test_week2_utils.py
+|   +-- 01-welcome.md
+|   +-- ... (9 lesson files)
 +-- week3/
-|   +-- README.md
-|   +-- tests/
-|       +-- test_week3_prompts.py
-|       +-- test_week3_service.py
-|       +-- test_week3_db_repos.py
-|       +-- test_week3_cli.py
+|   +-- ... (9 lesson files)
 +-- week4/
-|   +-- README.md
-|   +-- tests/
-|       +-- test_week4_preprocessing.py
-|       +-- test_week4_keyboards.py
-|       +-- test_week4_handlers.py
+|   +-- ... (9 lesson files)
 +-- week5/
-|   +-- README.md
-|   +-- tests/
-|       +-- test_week5_api.py
-|       +-- test_week5_streamlit.py
+|   +-- ... (9 lesson files)
 +-- week6/
-    +-- README.md
-    +-- tests/
-        +-- test_week6_docker.py
-        +-- test_week6_coverage.py
+    +-- ... (9 lesson files)
 ```
+
 
 ## Weekly Progression
 
@@ -91,22 +85,23 @@ This curriculum uses **Test-Driven Coaching** methodology:
 ```
 
 **How it works:**
-1. Each week provides complete, runnable pytest files
-2. You write production code to make those tests pass
-3. "Done" = all tests green (`pytest` exits 0)
-4. You NEVER write tests - you write the code UNDER test
+1. Each week's implementation lesson contains complete, runnable pytest code
+2. You copy the test code to your `tests/unit/` directory
+3. You write production code to make those tests pass
+4. "Done" = all tests green (`pytest` exits 0)
 
 
 ## Weekly Workflow
 
 For each week:
 
-1. **Read** the week's README.md for concepts and build guide
-2. **Copy** test files from `curriculum/weekN/tests/` to your `tests/unit/`
-3. **Run** `pytest tests/unit/test_weekN_*.py -v` - see all RED
-4. **Write** production code until all GREEN
-5. **Verify** with `ruff format --check .` and `ruff check .`
-6. **Done** when all tests pass and no linting errors
+1. **Read** the welcome file (`01-welcome.md`) for the big picture
+2. **Study** concept lessons (`02-*.md` through `06-*.md`)
+3. **Copy** tests from the implementation lesson to your `tests/unit/`
+4. **Run** `pytest tests/unit/test_weekN.py -v` - see all RED
+5. **Write** production code until all GREEN
+6. **Verify** with `ruff format --check .` and `ruff check .`
+7. **Review** success criteria before moving on
 
 
 ## Prerequisites
@@ -126,14 +121,16 @@ git clone <your-repo>
 cd expenses_ai_agent
 
 # Install dependencies
+uv venv
+source .venv/bin/activate
 uv pip install -e ".[dev]"
 
 # Copy .env.example to .env and add your API keys
 cp .env.example .env
 
 # Start with Week 1
-cp curriculum/week1/tests/*.py tests/unit/
-pytest tests/unit/test_week1_*.py -v
+# Read 01-welcome.md, then copy tests from 07-week1-implementation.md
+pytest tests/unit/test_week1.py -v
 
 # All tests should be RED - now write code to make them GREEN!
 ```
@@ -141,22 +138,22 @@ pytest tests/unit/test_week1_*.py -v
 
 ## Test Counts by Week
 
-| Week | Test Files | Test Count | Focus Area |
-|------|------------|------------|------------|
-| 1 | 2 | 26 | Models, In-Memory Repos |
-| 2 | 2 | 18 | LLM Protocol, Utils |
-| 3 | 4 | 30 | Service, DB Repos, CLI |
-| 4 | 3 | 28 | Preprocessing, Telegram |
-| 5 | 2 | 24 | FastAPI, Streamlit |
-| 6 | 2 | 10 | Docker, Coverage |
-| **Total** | **15** | **136** | |
+| Week | Test Count | Focus Area |
+|------|------------|------------|
+| 1 | 26 | Models, In-Memory Repos |
+| 2 | 18 | LLM Protocol, Utils |
+| 3 | 30 | Service, DB Repos, CLI |
+| 4 | 28 | Preprocessing, Telegram |
+| 5 | 24 | FastAPI, Streamlit |
+| 6 | 10 | Docker, Coverage |
+| **Total** | **136** | |
 
 
 ## Quality Commands
 
 ```bash
-# Run all curriculum tests
-pytest tests/unit/test_week*.py -v
+# Run all tests
+pytest tests/unit/ -v
 
 # Check formatting
 ruff format --check .
@@ -199,10 +196,22 @@ pytest --cov=src --cov-fail-under=95
 6. **Conversation Handlers** - Multi-step bot interactions
 
 
+## Lesson Types
+
+Each week contains three types of lessons:
+
+| Type | Purpose | Key Sections |
+|------|---------|--------------|
+| Welcome | Week introduction | Mental Model Shift, What Success Looks Like, Milestones |
+| Concept | Teach a pattern | Why It Exists, Core Usage, Python Comparison, Further Reading |
+| Implementation | Hands-on coding | Test Suite, Implementation Strategy, Step Hints |
+
+
 ## Support
 
-- Read the week's README carefully - it contains all the guidance you need
+- Read the week's lessons carefully - they contain all the guidance you need
 - Run tests frequently - they tell you exactly what to build
+- Join the cohort community for help and discussion
 - Use `--help` on CLI commands
 - Check FastAPI docs at http://localhost:8000/docs
 
