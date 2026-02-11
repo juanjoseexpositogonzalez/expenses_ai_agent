@@ -568,6 +568,14 @@ fly postgres backup list -a expenses-db
 
 ### Troubleshooting PostgreSQL
 
+**"App already contains a secret named DATABASE_URL"**:
+- The app has an existing DATABASE_URL (from SQLite setup)
+- Unset it first, then attach:
+  ```bash
+  fly secrets unset DATABASE_URL --app expenses-ai-agent-bot
+  fly postgres attach expenses-db --app expenses-ai-agent-bot
+  ```
+
 **Connection refused**:
 - Ensure both apps are attached: `fly postgres attach expenses-db --app <app-name>`
 - Check the app can reach the database: `fly ssh console --app expenses-ai-agent-api` then `ping expenses-db.flycast`
