@@ -24,6 +24,7 @@ dependencies = [
     "streamlit>=1.40.0",
     "plotly>=5.24.0",
     "pandas>=2.2.0",
+    "psycopg2-binary>=2.9.9",
 ]
 
 [project.scripts]

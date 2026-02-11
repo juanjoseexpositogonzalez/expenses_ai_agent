@@ -3,14 +3,14 @@
 # Docs: https://fly.io/docs/reference/configuration/
 
 app = "expenses-ai-agent-api"
-primary_region = "mad"  # Madrid
+primary_region = "cdg"  # Paris
 
 [build]
   dockerfile = "Dockerfile"
 
 [env]
-  DATABASE_URL = "sqlite:///./data/expenses.db"
   PORT = "8000"
+  # DATABASE_URL is set via: fly postgres attach or fly secrets set
 
 [http_service]
   internal_port = 8000
@@ -25,12 +25,11 @@ primary_region = "mad"  # Madrid
   cpu_kind = "shared"
   cpus = 1
 
-[mounts]
-  source = "expenses_data"
-  destination = "/app/data"
-
-# Health check
-[[services.http_checks]]
-  interval = "30s"
-  timeout = "5s"
-  path = "/health"
+# Health check (new syntax for machines)
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8000
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"

@@ -1,8 +1,7 @@
-from .cli import app
-
-
 def main():
     """Main entry point for the CLI application."""
+    from .cli import app
+
     app()
 
 
