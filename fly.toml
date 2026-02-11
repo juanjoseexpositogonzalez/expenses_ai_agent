@@ -29,8 +29,11 @@ primary_region = "cdg"  # Paris
   source = "expenses_data"
   destination = "/app/data"
 
-# Health check
-[[services.http_checks]]
-  interval = "30s"
-  timeout = "5s"
-  path = "/health"
+# Health check (new syntax for machines)
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8000
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
