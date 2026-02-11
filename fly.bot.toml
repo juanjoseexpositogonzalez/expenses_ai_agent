@@ -1,0 +1,29 @@
+# Fly.io configuration for Expenses AI Agent Telegram Bot
+# Deploy: fly deploy -c fly.bot.toml
+# Note: This is a separate app that shares the same database volume
+
+app = "expenses-ai-agent-bot"
+primary_region = "mad"  # Madrid
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  DATABASE_URL = "sqlite:///./data/expenses.db"
+
+# No HTTP service - this is a long-running bot process
+[processes]
+  bot = "expenses-telegram-bot"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "expenses_data"
+  destination = "/app/data"
+
+# Keep the bot always running
+[deploy]
+  strategy = "immediate"

@@ -208,3 +208,8 @@ __marimo__/
 
 .env
 .vscode/
+*.db
+CLAUDE.md
+.claude/
+.claude/**
+.claude_history/**
