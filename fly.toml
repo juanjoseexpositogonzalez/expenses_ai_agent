@@ -9,8 +9,8 @@ primary_region = "cdg"  # Paris
   dockerfile = "Dockerfile"
 
 [env]
-  DATABASE_URL = "sqlite:///./data/expenses.db"
   PORT = "8000"
+  # DATABASE_URL is set via: fly postgres attach or fly secrets set
 
 [http_service]
   internal_port = 8000
@@ -24,10 +24,6 @@ primary_region = "cdg"  # Paris
   memory = "512mb"
   cpu_kind = "shared"
   cpus = 1
-
-[mounts]
-  source = "expenses_data"
-  destination = "/app/data"
 
 # Health check (new syntax for machines)
 [checks]

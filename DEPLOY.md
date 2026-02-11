@@ -588,6 +588,11 @@ fly postgres backup list -a expenses-db
 - The attached user should have full permissions
 - Check connection string is correct in secrets
 
+**"DATABASE_URL may be a potentially sensitive environment variable"**:
+- This warning appears if DATABASE_URL is in `[env]` section of fly.toml
+- Remove it from `[env]` - it should only be set as a secret via `fly postgres attach` or `fly secrets set`
+- The config files have been updated to use secrets instead
+
 ---
 
 ## Alternative Database Options

@@ -9,7 +9,7 @@ primary_region = "cdg"  # Paris
   dockerfile = "Dockerfile"
 
 [env]
-  DATABASE_URL = "sqlite:///./data/expenses.db"
+  # DATABASE_URL is set via: fly postgres attach or fly secrets set
 
 # No HTTP service - this is a long-running bot process
 [processes]
@@ -19,10 +19,6 @@ primary_region = "cdg"  # Paris
   memory = "256mb"
   cpu_kind = "shared"
   cpus = 1
-
-[mounts]
-  source = "expenses_data"
-  destination = "/app/data"
 
 # Keep the bot always running
 [deploy]
