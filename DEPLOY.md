@@ -128,12 +128,6 @@ Expected response:
 {"status": "healthy"}
 ```
 
-Check logs if there are issues:
-
-```bash
-fly logs --app expenses-ai-agent-api
-```
-
 ### Step 1.7: Get Your API URL
 
 Your API is now live at:
@@ -168,7 +162,7 @@ The bot needs its own database volume. Create a volume in the same region as `fl
 fly volumes create expenses_data --region cdg --size 1 --app expenses-ai-agent-bot
 ```
 
-> **Note**: If you want the bot and API to share data, you'll need to use a shared database solution (PostgreSQL, Turso, etc.) instead of SQLite. For separate user bases, SQLite volumes work fine.
+> **Note**: If you want the bot and API to share data, see Part 4 (PostgreSQL) below.
 
 ### Step 2.3: Set Environment Secrets
 
@@ -298,157 +292,11 @@ fly secrets set \
 
 ---
 
-## Post-Deployment Verification
-
-### Checklist
-
-- [ ] **FastAPI**: `curl https://your-api.fly.dev/health` returns `{"status": "healthy"}`
-- [ ] **FastAPI**: `curl https://your-api.fly.dev/api/v1/categories` returns category list
-- [ ] **Telegram Bot**: `/start` command works
-- [ ] **Telegram Bot**: Expense classification works
-- [ ] **Streamlit**: Dashboard loads without API errors
-- [ ] **Streamlit**: Can add new expenses
-- [ ] **Integration**: Expenses added via Telegram appear in Streamlit (if sharing DB)
-
-### Monitoring Commands
-
-```bash
-# View FastAPI logs
-fly logs --app expenses-ai-agent-api
-
-# View Bot logs
-fly logs --app expenses-ai-agent-bot
-
-# Check app status
-fly status --app expenses-ai-agent-api
-fly status --app expenses-ai-agent-bot
-
-# SSH into container (for debugging)
-fly ssh console --app expenses-ai-agent-api
-
-# Check secrets (names only, not values)
-fly secrets list --app expenses-ai-agent-api
-```
-
----
-
-## Troubleshooting
-
-### FastAPI Won't Start
-
-**Symptom**: Health check fails, app crashes
-
-**Solutions**:
-1. Check logs: `fly logs --app expenses-ai-agent-api`
-2. Verify secrets are set: `fly secrets list --app expenses-ai-agent-api`
-3. Ensure volume is mounted: `fly volumes list --app expenses-ai-agent-api`
-
-### Telegram Bot Not Responding
-
-**Symptom**: Bot doesn't reply to messages
-
-**Solutions**:
-1. Check logs: `fly logs --app expenses-ai-agent-bot`
-2. Verify `TELEGRAM_BOT_TOKEN` is correct
-3. Ensure bot is running: `fly status --app expenses-ai-agent-bot`
-4. Check if another instance is running (only one bot per token)
-
-### Streamlit Can't Connect to API
-
-**Symptom**: "API is not available" error
-
-**Solutions**:
-1. Verify `API_BASE_URL` in Streamlit secrets
-2. Check CORS_ORIGINS includes your Streamlit URL
-3. Test API directly: `curl https://your-api.fly.dev/health`
-
-### Database Issues
-
-**Symptom**: Data not persisting between deploys
-
-**Solutions**:
-1. Verify volume is created: `fly volumes list --app your-app`
-2. Check volume is mounted at `/app/data`
-3. Ensure `DATABASE_URL` points to `/app/data/expenses.db`
-
----
-
-## Cost Estimates
-
-### Fly.io (as of 2024)
-
-| Resource | Free Tier | Paid |
-|----------|-----------|------|
-| Shared CPU VMs | 3 VMs | $1.94/mo per 256MB |
-| Persistent Storage | 3GB total | $0.15/GB/mo |
-| Outbound Transfer | 100GB/mo | $0.02/GB |
-
-**Estimated monthly cost**: $0 (within free tier for light usage)
-
-### Streamlit Cloud
-
-| Plan | Cost | Limits |
-|------|------|--------|
-| Free | $0 | Public repos, 1GB memory |
-| Teams | $250/mo | Private repos, more resources |
-
----
-
-## Updating Deployments
-
-### Update FastAPI or Bot
-
-```bash
-# Make changes, then:
-git add .
-git commit -m "Update feature"
-git push origin main
-
-# Deploy FastAPI
-fly deploy --app expenses-ai-agent-api
-
-# Deploy Bot
-fly deploy -c fly.bot.toml
-```
-
-### Update Streamlit
-
-Streamlit Cloud automatically redeploys when you push to the connected branch.
-
----
-
-## Architecture Overview
-
-```
-┌─────────────────┐     ┌─────────────────┐
-│   Telegram      │     │   Streamlit     │
-│   Mobile App    │     │   Dashboard     │
-└────────┬────────┘     └────────┬────────┘
-         │                       │
-         ▼                       ▼
-┌─────────────────┐     ┌─────────────────┐
-│  Telegram Bot   │     │   FastAPI       │
-│  (Fly.io)       │     │   (Fly.io)      │
-│                 │     │                 │
-│  SQLite Volume  │     │  SQLite Volume  │
-└─────────────────┘     └─────────────────┘
-         │                       │
-         ▼                       ▼
-┌─────────────────────────────────────────┐
-│              OpenAI API                 │
-│         (Expense Classification)        │
-└─────────────────────────────────────────┘
-```
-
-> **Note**: Bot and API use separate SQLite databases by default. See "Part 4: Shared Database" below to share data between services.
-
----
-
 ## Part 4: Shared Database with PostgreSQL (Fly.io)
 
 By default, the Telegram Bot and FastAPI use separate SQLite databases. To share expenses between both services, migrate to Fly Postgres.
 
-There are several options for a shared PostgreSQL database:
+### Database Options Comparison
 
 | Option | Cost | Pros | Cons |
 |--------|------|------|------|
@@ -472,25 +320,35 @@ Choose the **Development** plan (free tier):
 
 Save the connection string output - you'll need it!
 
-### Step 4.2: Get Database Connection String
+### Step 4.2: Attach Database to Both Apps
 
 ```bash
-fly postgres connect -a expenses-db
-```
-
-Or get the connection string:
-
-```bash
+# Attach to API
 fly postgres attach expenses-db --app expenses-ai-agent-api
+
+# Attach to Bot (unset existing DATABASE_URL first if needed)
+fly secrets unset DATABASE_URL --app expenses-ai-agent-bot
+fly postgres attach expenses-db --app expenses-ai-agent-bot
 ```
 
-This automatically sets `DATABASE_URL` as a secret. The format is:
+This automatically sets `DATABASE_URL` as a secret on both apps.
 
-```
-postgres://postgres:<password>@expenses-db.flycast:5432/expenses_db?sslmode=disable
+### Step 4.3: Fix DATABASE_URL Protocol
+
+Fly.io sets `postgres://` but SQLAlchemy requires `postgresql://`. Update the secrets:
+
+```bash
+# Check current value
+fly ssh console --app expenses-ai-agent-api -C "printenv DATABASE_URL"
+
+# Update to use postgresql:// (change postgres:// to postgresql://)
+fly secrets set DATABASE_URL="postgresql://user:pass@expenses-db.flycast:5432/dbname?sslmode=disable" --app expenses-ai-agent-api
+fly secrets set DATABASE_URL="postgresql://user:pass@expenses-db.flycast:5432/dbname?sslmode=disable" --app expenses-ai-agent-bot
 ```
 
-### Step 4.3: Install PostgreSQL Driver
+> **Important**: Replace `user`, `pass`, and `dbname` with your actual values from the attach output.
+
+### Step 4.4: Install PostgreSQL Driver
 
 Add `psycopg2-binary` to your dependencies in `pyproject.toml`:
 
@@ -509,18 +367,6 @@ git add pyproject.toml uv.lock
 git commit -m "Add psycopg2 for PostgreSQL support"
 git push
 ```
-
-### Step 4.4: Attach Database to Both Apps
-
-```bash
-# Attach to API (if not already done)
-fly postgres attach expenses-db --app expenses-ai-agent-api
-
-# Attach to Bot
-fly postgres attach expenses-db --app expenses-ai-agent-bot
-```
-
-This sets `DATABASE_URL` secret on both apps automatically.
 
 ### Step 4.5: Remove SQLite Volume Mounts (Optional)
 
@@ -566,33 +412,6 @@ fly postgres backup create -a expenses-db
 fly postgres backup list -a expenses-db
 ```
 
-### Troubleshooting PostgreSQL
-
-**"App already contains a secret named DATABASE_URL"**:
-- The app has an existing DATABASE_URL (from SQLite setup)
-- Unset it first, then attach:
-  ```bash
-  fly secrets unset DATABASE_URL --app expenses-ai-agent-bot
-  fly postgres attach expenses-db --app expenses-ai-agent-bot
-  ```
-
-**Connection refused**:
-- Ensure both apps are attached: `fly postgres attach expenses-db --app <app-name>`
-- Check the app can reach the database: `fly ssh console --app expenses-ai-agent-api` then `ping expenses-db.flycast`
-
-**Tables not created**:
-- SQLModel creates tables on first connection
-- Check logs: `fly logs --app expenses-ai-agent-api`
-
-**Permission denied**:
-- The attached user should have full permissions
-- Check connection string is correct in secrets
-
-**"DATABASE_URL may be a potentially sensitive environment variable"**:
-- This warning appears if DATABASE_URL is in `[env]` section of fly.toml
-- Remove it from `[env]` - it should only be set as a secret via `fly postgres attach` or `fly secrets set`
-- The config files have been updated to use secrets instead
-
 ---
 
 ## Alternative Database Options
@@ -607,11 +426,11 @@ fly mpg create --name expenses-db --region cdg
 
 See pricing and features: https://fly.io/docs/mpg/overview/
 
-After creation, set the connection string manually:
+After creation, set the connection string manually (use `postgresql://` not `postgres://`):
 
 ```bash
-fly secrets set DATABASE_URL="<connection-string-from-mpg>" --app expenses-ai-agent-api
-fly secrets set DATABASE_URL="<connection-string-from-mpg>" --app expenses-ai-agent-bot
+fly secrets set DATABASE_URL="postgresql://..." --app expenses-ai-agent-api
+fly secrets set DATABASE_URL="postgresql://..." --app expenses-ai-agent-bot
 ```
 
 ### Option C: Neon (External - Free Tier)
@@ -620,12 +439,13 @@ Neon offers serverless Postgres with a generous free tier.
 
 1. Sign up at https://neon.tech
 2. Create a new project
-3. Copy the connection string (looks like `postgres://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require`)
-4. Set on both apps:
+3. Copy the connection string
+4. **Important**: Change `postgres://` to `postgresql://` in the URL
+5. Set on both apps:
 
 ```bash
-fly secrets set DATABASE_URL="postgres://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require" --app expenses-ai-agent-api
-fly secrets set DATABASE_URL="postgres://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require" --app expenses-ai-agent-bot
+fly secrets set DATABASE_URL="postgresql://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require" --app expenses-ai-agent-api
+fly secrets set DATABASE_URL="postgresql://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require" --app expenses-ai-agent-bot
 ```
 
 **Free tier limits**: 0.5GB storage, 3GB data transfer/month
@@ -637,14 +457,201 @@ Supabase provides Postgres with additional features (auth, storage, realtime).
 1. Sign up at https://supabase.com
 2. Create a new project
 3. Go to Settings → Database → Connection string
-4. Copy the URI and set on both apps:
+4. **Important**: Change `postgres://` to `postgresql://` in the URL
+5. Set on both apps:
 
 ```bash
-fly secrets set DATABASE_URL="postgres://postgres:pass@db.xxx.supabase.co:5432/postgres" --app expenses-ai-agent-api
-fly secrets set DATABASE_URL="postgres://postgres:pass@db.xxx.supabase.co:5432/postgres" --app expenses-ai-agent-bot
+fly secrets set DATABASE_URL="postgresql://postgres:pass@db.xxx.supabase.co:5432/postgres" --app expenses-ai-agent-api
+fly secrets set DATABASE_URL="postgresql://postgres:pass@db.xxx.supabase.co:5432/postgres" --app expenses-ai-agent-bot
 ```
 
 **Free tier limits**: 500MB storage, 2 projects
+
+---
+
+## Post-Deployment Verification
+
+### Checklist
+
+- [ ] **FastAPI**: `curl https://your-api.fly.dev/health` returns `{"status": "healthy"}`
+- [ ] **FastAPI**: `curl https://your-api.fly.dev/api/v1/categories` returns category list
+- [ ] **Telegram Bot**: `/start` command works
+- [ ] **Telegram Bot**: `/currency` command works
+- [ ] **Telegram Bot**: Expense classification works
+- [ ] **Streamlit**: Dashboard loads without API errors
+- [ ] **Streamlit**: Can add new expenses
+- [ ] **Integration**: Expenses added via Telegram appear in Streamlit (if using shared DB)
+
+### Monitoring Commands
+
+```bash
+# View FastAPI logs
+fly logs --app expenses-ai-agent-api
+
+# View Bot logs
+fly logs --app expenses-ai-agent-bot
+
+# Check app status
+fly status --app expenses-ai-agent-api
+fly status --app expenses-ai-agent-bot
+
+# SSH into container (for debugging)
+fly ssh console --app expenses-ai-agent-api
+
+# Check secrets (names only, not values)
+fly secrets list --app expenses-ai-agent-api
+```
+
+---
+
+## Updating Deployments
+
+### Update FastAPI or Bot
+
+```bash
+# Make changes, then:
+git add .
+git commit -m "Update feature"
+git push origin main
+
+# Deploy FastAPI
+fly deploy --app expenses-ai-agent-api
+
+# Deploy Bot
+fly deploy -c fly.bot.toml
+```
+
+### Update Streamlit
+
+Streamlit Cloud automatically redeploys when you push to the connected branch.
+
+---
+
+## Cost Estimates
+
+### Fly.io (as of 2024)
+
+| Resource | Free Tier | Paid |
+|----------|-----------|------|
+| Shared CPU VMs | 3 VMs | $1.94/mo per 256MB |
+| Persistent Storage | 3GB total | $0.15/GB/mo |
+| Outbound Transfer | 100GB/mo | $0.02/GB |
+
+**Estimated monthly cost**: $0 (within free tier for light usage)
+
+### Streamlit Cloud
+
+| Plan | Cost | Limits |
+|------|------|--------|
+| Free | $0 | Public repos, 1GB memory |
+| Teams | $250/mo | Private repos, more resources |
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│   Telegram      │     │   Streamlit     │
+│   Mobile App    │     │   Dashboard     │
+└────────┬────────┘     └────────┬────────┘
+         │                       │
+         ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐
+│  Telegram Bot   │     │   FastAPI       │
+│  (Fly.io)       │     │   (Fly.io)      │
+└────────┬────────┘     └────────┬────────┘
+         │                       │
+         └───────────┬───────────┘
+                     ▼
+         ┌─────────────────────┐
+         │   Fly Postgres      │
+         │  (Shared Database)  │
+         └──────────┬──────────┘
+                    │
+                    ▼
+         ┌─────────────────────┐
+         │     OpenAI API      │
+         │ (Classification)    │
+         └─────────────────────┘
+```
+
+---
+
+## Troubleshooting
+
+### General
+
+**Health check failing / App won't start**:
+1. Check logs: `fly logs --app <app-name>`
+2. Verify secrets are set: `fly secrets list --app <app-name>`
+3. Ensure volume is mounted: `fly volumes list --app <app-name>`
+
+**Deployment stuck**:
+```bash
+# Use --detach to not wait for health checks
+fly deploy --detach
+
+# Or destroy stuck machine and redeploy
+fly machines list --app <app-name>
+fly machines destroy <machine-id> --app <app-name> --force
+fly deploy
+```
+
+### FastAPI
+
+**Volume region mismatch error**:
+- The volume region must match `primary_region` in `fly.toml`
+- Either create volume in the correct region or update `fly.toml`
+
+### Telegram Bot
+
+**"Conflict: terminated by other getUpdates request"**:
+- Another bot instance is running with the same token
+- The code uses `drop_pending_updates=True` to handle this on restart
+
+**Bot not responding**:
+1. Check logs: `fly logs --app expenses-ai-agent-bot`
+2. Verify `TELEGRAM_BOT_TOKEN` is correct
+3. Ensure only one instance is running
+
+### Streamlit
+
+**"API is not available" error**:
+1. Verify `API_BASE_URL` in Streamlit secrets
+2. Check CORS_ORIGINS includes your Streamlit URL
+3. Test API directly: `curl https://your-api.fly.dev/health`
+
+**Import error / Missing OPENAI_API_KEY**:
+- This was fixed by lazy-loading the CLI module
+- Ensure you're using the latest code
+
+### PostgreSQL
+
+**"App already contains a secret named DATABASE_URL"**:
+```bash
+fly secrets unset DATABASE_URL --app <app-name>
+fly postgres attach expenses-db --app <app-name>
+```
+
+**"Can't load plugin: sqlalchemy.dialects:postgres"**:
+- SQLAlchemy requires `postgresql://` not `postgres://`
+- Update DATABASE_URL to use `postgresql://` instead:
+```bash
+fly secrets set DATABASE_URL="postgresql://..." --app <app-name>
+```
+
+**"DATABASE_URL may be a potentially sensitive environment variable"**:
+- Remove DATABASE_URL from `[env]` section in fly.toml
+- Set it only via `fly secrets set` or `fly postgres attach`
+
+**Connection refused**:
+- Ensure app is attached: `fly postgres attach expenses-db --app <app-name>`
+- Check network: `fly ssh console --app <app-name>` then `ping expenses-db.flycast`
+
+**Tables not created**:
+- SQLModel creates tables on first connection
+- Check logs for errors: `fly logs --app <app-name>`
 
 ---
 
