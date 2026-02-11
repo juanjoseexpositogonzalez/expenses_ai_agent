@@ -81,7 +81,10 @@ class ExpenseTelegramBot:
 
         assert self.application is not None  # noqa: S101
         logger.info("Starting bot polling...")
-        self.application.run_polling(allowed_updates=Update.ALL_TYPES)
+        self.application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+        )
 
 
 def main() -> None:
