@@ -448,17 +448,27 @@ Streamlit Cloud automatically redeploys when you push to the connected branch.
 
 By default, the Telegram Bot and FastAPI use separate SQLite databases. To share expenses between both services, migrate to Fly Postgres.
 
-### Step 4.1: Create Fly Postgres Cluster
+There are several options for a shared PostgreSQL database:
+
+| Option | Cost | Pros | Cons |
+|--------|------|------|------|
+| Fly Postgres (Unmanaged) | Free tier | Same network, low latency | Self-managed, no support |
+| Fly Managed Postgres | ~$15/mo+ | Fully managed, supported | Higher cost |
+| Neon | Free tier (0.5GB) | Serverless, auto-scaling | External latency |
+| Supabase | Free tier (500MB) | Dashboard, auth features | External latency |
+
+### Option A: Fly Postgres (Unmanaged) - Recommended for Learning
 
 ```bash
 fly postgres create --name expenses-db --region cdg
 ```
 
-Choose the **Development** plan for cost efficiency:
+> **Note**: You'll see a warning about "Unmanaged Fly Postgres". Type `y` to continue - it still works, just means Fly won't help debug database issues.
+
+Choose the **Development** plan (free tier):
 - 1 shared CPU
 - 256MB RAM
 - 1GB storage
-- ~$0/month (free tier)
 
 Save the connection string output - you'll need it!
 
@@ -569,6 +579,59 @@ fly postgres backup list -a expenses-db
 **Permission denied**:
 - The attached user should have full permissions
 - Check connection string is correct in secrets
+
+---
+
+## Alternative Database Options
+
+### Option B: Fly Managed Postgres
+
+For production workloads with support:
+
+```bash
+fly mpg create --name expenses-db --region cdg
+```
+
+See pricing and features: https://fly.io/docs/mpg/overview/
+
+After creation, set the connection string manually:
+
+```bash
+fly secrets set DATABASE_URL="<connection-string-from-mpg>" --app expenses-ai-agent-api
+fly secrets set DATABASE_URL="<connection-string-from-mpg>" --app expenses-ai-agent-bot
+```
+
+### Option C: Neon (External - Free Tier)
+
+Neon offers serverless Postgres with a generous free tier.
+
+1. Sign up at https://neon.tech
+2. Create a new project
+3. Copy the connection string (looks like `postgres://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require`)
+4. Set on both apps:
+
+```bash
+fly secrets set DATABASE_URL="postgres://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require" --app expenses-ai-agent-api
+fly secrets set DATABASE_URL="postgres://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require" --app expenses-ai-agent-bot
+```
+
+**Free tier limits**: 0.5GB storage, 3GB data transfer/month
+
+### Option D: Supabase (External - Free Tier)
+
+Supabase provides Postgres with additional features (auth, storage, realtime).
+
+1. Sign up at https://supabase.com
+2. Create a new project
+3. Go to Settings → Database → Connection string
+4. Copy the URI and set on both apps:
+
+```bash
+fly secrets set DATABASE_URL="postgres://postgres:pass@db.xxx.supabase.co:5432/postgres" --app expenses-ai-agent-api
+fly secrets set DATABASE_URL="postgres://postgres:pass@db.xxx.supabase.co:5432/postgres" --app expenses-ai-agent-bot
+```
+
+**Free tier limits**: 500MB storage, 2 projects
 
 ---
 
