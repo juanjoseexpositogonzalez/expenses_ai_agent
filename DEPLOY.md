@@ -604,6 +604,24 @@ fly deploy
 - The volume region must match `primary_region` in `fly.toml`
 - Either create volume in the correct region or update `fly.toml`
 
+**Multiple machines in different regions**:
+- If you have machines in wrong regions (e.g., fra instead of cdg), clean them up:
+```bash
+fly machines list --app expenses-ai-agent-api
+fly machines destroy <machine-id> --app expenses-ai-agent-api --force
+fly deploy
+```
+
+**API keeps stopping / Streamlit can't connect**:
+- The API uses `auto_stop_machines = "stop"` by default
+- First request should wake it up, but may timeout
+- To keep API always running, edit `fly.toml`:
+```toml
+[http_service]
+  auto_stop_machines = "off"
+  min_machines_running = 1
+```
+
 ### Telegram Bot
 
 **"Conflict: terminated by other getUpdates request"**:
@@ -652,6 +670,26 @@ fly secrets set DATABASE_URL="postgresql://..." --app <app-name>
 **Tables not created**:
 - SQLModel creates tables on first connection
 - Check logs for errors: `fly logs --app <app-name>`
+
+**Password authentication failed**:
+- The password in DATABASE_URL doesn't match what's in Postgres
+- Reset the password in the database:
+```bash
+# Connect to postgres
+fly postgres connect -a expenses-db
+
+# Reset password (use your actual password from DATABASE_URL or set a new one)
+ALTER USER expenses_ai_agent_api WITH PASSWORD 'YourNewPassword';
+ALTER USER expenses_ai_agent_bot WITH PASSWORD 'YourNewPassword';
+\q
+
+# Update secrets with the new password
+fly secrets set DATABASE_URL="postgresql://expenses_ai_agent_api:YourNewPassword@expenses-db.flycast:5432/expenses_ai_agent_api?sslmode=disable" --app expenses-ai-agent-api
+
+fly secrets set DATABASE_URL="postgresql://expenses_ai_agent_api:YourNewPassword@expenses-db.flycast:5432/expenses_ai_agent_api?sslmode=disable" --app expenses-ai-agent-bot
+```
+
+**Both apps can share the same database user** - they're accessing the same tables anyway.
 
 ---
 
