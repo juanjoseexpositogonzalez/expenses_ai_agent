@@ -440,7 +440,135 @@ Streamlit Cloud automatically redeploys when you push to the connected branch.
 └─────────────────────────────────────────┘
 ```
 
-> **Note**: Bot and API use separate SQLite databases by default. For shared data, consider using a managed database like Fly Postgres or Turso.
+> **Note**: Bot and API use separate SQLite databases by default. See "Part 4: Shared Database" below to share data between services.
+
+---
+
+## Part 4: Shared Database with PostgreSQL (Fly.io)
+
+By default, the Telegram Bot and FastAPI use separate SQLite databases. To share expenses between both services, migrate to Fly Postgres.
+
+### Step 4.1: Create Fly Postgres Cluster
+
+```bash
+fly postgres create --name expenses-db --region cdg
+```
+
+Choose the **Development** plan for cost efficiency:
+- 1 shared CPU
+- 256MB RAM
+- 1GB storage
+- ~$0/month (free tier)
+
+Save the connection string output - you'll need it!
+
+### Step 4.2: Get Database Connection String
+
+```bash
+fly postgres connect -a expenses-db
+```
+
+Or get the connection string:
+
+```bash
+fly postgres attach expenses-db --app expenses-ai-agent-api
+```
+
+This automatically sets `DATABASE_URL` as a secret. The format is:
+
+```
+postgres://postgres:<password>@expenses-db.flycast:5432/expenses_db?sslmode=disable
+```
+
+### Step 4.3: Install PostgreSQL Driver
+
+Add `psycopg2-binary` to your dependencies in `pyproject.toml`:
+
+```toml
+dependencies = [
+    # ... existing deps ...
+    "psycopg2-binary>=2.9.9",
+]
+```
+
+Then update the lock file and redeploy:
+
+```bash
+uv lock
+git add pyproject.toml uv.lock
+git commit -m "Add psycopg2 for PostgreSQL support"
+git push
+```
+
+### Step 4.4: Attach Database to Both Apps
+
+```bash
+# Attach to API (if not already done)
+fly postgres attach expenses-db --app expenses-ai-agent-api
+
+# Attach to Bot
+fly postgres attach expenses-db --app expenses-ai-agent-bot
+```
+
+This sets `DATABASE_URL` secret on both apps automatically.
+
+### Step 4.5: Remove SQLite Volume Mounts (Optional)
+
+Since we're using PostgreSQL, the SQLite volumes are no longer needed. Edit `fly.toml` and `fly.bot.toml` to remove:
+
+```toml
+# Remove this section from both files:
+[mounts]
+  source = "expenses_data"
+  destination = "/app/data"
+```
+
+### Step 4.6: Redeploy Both Apps
+
+```bash
+# Redeploy API
+fly deploy --app expenses-ai-agent-api
+
+# Redeploy Bot
+fly deploy -c fly.bot.toml
+```
+
+### Step 4.7: Verify Shared Database
+
+1. Add an expense via Telegram Bot
+2. Check the Streamlit Dashboard - the expense should appear
+3. Add an expense via Dashboard
+4. The data is now shared!
+
+### PostgreSQL Management Commands
+
+```bash
+# Connect to database shell
+fly postgres connect -a expenses-db
+
+# View database size
+fly postgres db list -a expenses-db
+
+# Create a backup
+fly postgres backup create -a expenses-db
+
+# View backups
+fly postgres backup list -a expenses-db
+```
+
+### Troubleshooting PostgreSQL
+
+**Connection refused**:
+- Ensure both apps are attached: `fly postgres attach expenses-db --app <app-name>`
+- Check the app can reach the database: `fly ssh console --app expenses-ai-agent-api` then `ping expenses-db.flycast`
+
+**Tables not created**:
+- SQLModel creates tables on first connection
+- Check logs: `fly logs --app expenses-ai-agent-api`
+
+**Permission denied**:
+- The attached user should have full permissions
+- Check connection string is correct in secrets
 
 ---
 
@@ -448,5 +576,4 @@ Streamlit Cloud automatically redeploys when you push to the connected branch.
 
 1. **Custom Domain**: Configure custom domains in Fly.io dashboard
 2. **Monitoring**: Set up Fly.io Metrics or external monitoring
-3. **Backups**: Implement SQLite backup strategy
-4. **Shared Database**: Migrate to PostgreSQL for data sharing between services
+3. **Backups**: Schedule regular PostgreSQL backups with `fly postgres backup create`
