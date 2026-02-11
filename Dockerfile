@@ -23,9 +23,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
 
-# Install dependencies using uv sync (creates .venv automatically)
-RUN uv sync --frozen --no-dev
+# Create virtual environment and install dependencies
+RUN uv venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
+ENV VIRTUAL_ENV="/app/.venv"
+RUN uv sync --frozen --no-dev
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
