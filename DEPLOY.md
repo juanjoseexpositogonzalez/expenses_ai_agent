@@ -73,13 +73,15 @@ fly apps create expenses-ai-agent-api
 
 ### Step 1.3: Create Persistent Volume
 
-The SQLite database needs persistent storage:
+The SQLite database needs persistent storage.
+
+> **Important**: The volume region MUST match `primary_region` in `fly.toml` (default: `cdg` Paris). If you want a different region, update `fly.toml` first.
 
 ```bash
-fly volumes create expenses_data --region mad --size 1 --app expenses-ai-agent-api
+fly volumes create expenses_data --region cdg --size 1 --app expenses-ai-agent-api
 ```
 
-- `--region mad`: Madrid (change to your preferred region)
+- `--region cdg`: Must match `primary_region` in `fly.toml`
 - `--size 1`: 1GB storage (sufficient for SQLite)
 
 List available regions:
@@ -109,7 +111,7 @@ fly deploy
 This will:
 1. Build the Docker image
 2. Push to Fly.io registry
-3. Deploy to the `mad` region
+3. Deploy to the region specified in `fly.toml`
 4. Run health checks
 
 ### Step 1.6: Verify Deployment
@@ -160,10 +162,10 @@ fly apps create expenses-ai-agent-bot
 
 ### Step 2.2: Create Persistent Volume
 
-The bot needs access to the same database. Create a volume:
+The bot needs its own database volume. Create a volume in the same region as `fly.bot.toml`:
 
 ```bash
-fly volumes create expenses_data --region mad --size 1 --app expenses-ai-agent-bot
+fly volumes create expenses_data --region cdg --size 1 --app expenses-ai-agent-bot
 ```
 
 > **Note**: If you want the bot and API to share data, you'll need to use a shared database solution (PostgreSQL, Turso, etc.) instead of SQLite. For separate user bases, SQLite volumes work fine.

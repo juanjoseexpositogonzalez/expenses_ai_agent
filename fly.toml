@@ -3,7 +3,7 @@
 # Docs: https://fly.io/docs/reference/configuration/
 
 app = "expenses-ai-agent-api"
-primary_region = "mad"  # Madrid
+primary_region = "cdg"  # Paris
 
 [build]
   dockerfile = "Dockerfile"

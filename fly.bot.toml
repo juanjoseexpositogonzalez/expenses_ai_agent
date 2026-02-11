@@ -3,7 +3,7 @@
 # Note: This is a separate app that shares the same database volume
 
 app = "expenses-ai-agent-bot"
-primary_region = "mad"  # Madrid
+primary_region = "cdg"  # Paris
 
 [build]
   dockerfile = "Dockerfile"
